@@ -1,9 +1,6 @@
-"""
-RAG Brain - LLM-powered answer generation.
-Path: src/retrieval/brain.py
-"""
 import os
 import yaml
+import requests
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
@@ -17,21 +14,34 @@ class RAGBrain:
     
     def __init__(self, model_name: Optional[str] = None):
         """
-        Initialize RAG Brain with Gemini.
+        Initialize RAG Brain with configured provider.
         
         Args:
-            model_name: Gemini model to use. If None, loads from config.yaml
+            model_name: Model to use. If None, loads from config.yaml
         """
         self.config = self._load_config()
-        self.model_name = model_name or self.config.get('llm', {}).get('model_name', "gemini-2.0-flash")
-        self.model = None
-        self._initialize_model()
-    
+        llm_config = self.config.get('llm', {})
+        
+        # Determine provider and model
+        self.provider = llm_config.get('provider', 'gemini')
+        self.model_name = model_name or llm_config.get('model_name', "gemini-2.0-flash")
+        
+        # Initialize generic "model" placeholder
+        self.model = None 
+        
+        # Provider specific initialization
+        if self.provider == 'gemini':
+            self._initialize_gemini()
+        elif self.provider == 'huggingface':
+            self._initialize_huggingface(llm_config)
+        else:
+            print(f"[WARN] Unknown provider '{self.provider}'. Defaulting to Gemini.")
+            self.provider = 'gemini'
+            self._initialize_gemini()
+
     def _load_config(self) -> Dict[str, Any]:
         """Load configuration from config.yaml"""
         try:
-            # Assuming config.yaml is in the project root
-            # src/retrieval/brain.py -> src/retrieval -> src -> root
             config_path = Path(__file__).resolve().parent.parent.parent / "config.yaml"
             if config_path.exists():
                 with open(config_path, 'r') as f:
@@ -40,42 +50,36 @@ class RAGBrain:
             print(f"[WARN] Failed to load config.yaml: {e}")
         return {}
     
-    def _initialize_model(self):
+    def _initialize_gemini(self):
         """Initialize Gemini model with API key"""
         try:
             import google.generativeai as genai
             
             api_key = os.getenv('GOOGLE_API_KEY')
             if not api_key:
-                raise ValueError(
-                    "GOOGLE_API_KEY not found in environment. "
-                    "Please add it to your .env file."
-                )
-            
-            genai.configure(api_key=api_key)
-            self.model = genai.GenerativeModel(self.model_name)
-            print(f"[INFO] Initialized RAG Brain with {self.model_name}")
+                print("[WARN] GOOGLE_API_KEY not found. Gemini will fail if used.")
+            else:
+                genai.configure(api_key=api_key)
+                self.model = genai.GenerativeModel(self.model_name)
+                print(f"[INFO] Initialized RAG Brain with Gemini: {self.model_name}")
             
         except ImportError:
-            raise ImportError(
-                "google-generativeai not installed. "
-                "Run: pip install google-generativeai"
-            )
+            print("[ERROR] google-generativeai not installed.")
         except Exception as e:
             print(f"[ERROR] Failed to initialize Gemini: {e}")
-            raise
-    
-    def generate_answer(self, query: str, contexts: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """
-        Generate an answer based on query and retrieved contexts.
+
+    def _initialize_huggingface(self, config: Dict[str, Any]):
+        """Initialize Hugging Face client"""
+        self.hf_api_key = os.getenv(config.get('api_key_env_var', 'HUGGINGFACE_API_KEY'))
+        self.hf_api_url = f"https://api-inference.huggingface.co/models/{self.model_name}"
         
-        Args:
-            query: User's question
-            contexts: List of retrieved documents with metadata
-            
-        Returns:
-            Dictionary with answer and metadata
-        """
+        if not self.hf_api_key:
+             print("[WARN] HUGGINGFACE_API_KEY not found. Inference will fail.")
+        else:
+             print(f"[INFO] Initialized RAG Brain with Hugging Face: {self.model_name}")
+
+    def generate_answer(self, query: str, contexts: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Generate answer based on provider"""
         if not contexts:
             return {
                 "answer": "I couldn't find any relevant information to answer your question.",
@@ -83,19 +87,13 @@ class RAGBrain:
                 "sources_used": 0
             }
         
-        # Build prompt with contexts
         prompt = self._build_prompt(query, contexts)
         
         try:
-            # Generate response
-            response = self.model.generate_content(prompt)
-            answer = response.text
-            
-            return {
-                "answer": answer,
-                "confidence": "high" if len(contexts) >= 3 else "medium",
-                "sources_used": len(contexts)
-            }
+            if self.provider == 'gemini':
+                return self._generate_gemini(prompt, len(contexts))
+            elif self.provider == 'huggingface':
+                return self._generate_huggingface(prompt, len(contexts))
             
         except Exception as e:
             print(f"[ERROR] Failed to generate answer: {e}")
@@ -104,7 +102,55 @@ class RAGBrain:
                 "confidence": "error",
                 "sources_used": len(contexts)
             }
-    
+        return {"answer": "Provider error", "confidence": "error", "sources_used": 0}
+
+    def _generate_gemini(self, prompt: str, num_sources: int) -> Dict[str, Any]:
+         if not self.model:
+             raise ValueError("Gemini model not initialized")
+         
+         response = self.model.generate_content(prompt)
+         return {
+            "answer": response.text,
+            "confidence": "high" if num_sources >= 3 else "medium",
+            "sources_used": num_sources
+        }
+
+    def _generate_huggingface(self, prompt: str, num_sources: int) -> Dict[str, Any]:
+        headers = {"Authorization": f"Bearer {self.hf_api_key}"}
+        
+        # Instruction formatting for chat models
+        formatted_prompt = f"<s>[INST] {prompt} [/INST]" 
+
+        payload = {
+            "inputs": formatted_prompt,
+            "parameters": {
+                "max_new_tokens": 512,
+                "temperature": 0.7,
+                "return_full_text": False
+            }
+        }
+        
+        response = requests.post(self.hf_api_url, headers=headers, json=payload)
+        
+        if response.status_code != 200:
+            raise Exception(f"Hugging Face API Error ({response.status_code}): {response.text}")
+            
+        result = response.json()
+        
+        # Handle different response formats
+        if isinstance(result, list) and 'generated_text' in result[0]:
+            answer = result[0]['generated_text']
+        elif isinstance(result, dict) and 'generated_text' in result:
+             answer = result['generated_text']
+        else:
+             answer = str(result)
+
+        return {
+            "answer": answer.strip(),
+            "confidence": "high" if num_sources >= 3 else "medium",
+            "sources_used": num_sources
+        }
+
     def _build_prompt(self, query: str, contexts: List[Dict[str, Any]]) -> str:
         """
         Build prompt for LLM with query and contexts.
@@ -186,7 +232,17 @@ class RAGBrain:
 Provide a concise summary highlighting key points, decisions, and action items."""
         
         try:
-            response = self.model.generate_content(prompt)
-            return response.text
+            if self.provider == 'gemini':
+                # Gemini returns the object, need to extract text
+                 if not self.model:
+                     return "Gemini model not initialized"
+                 response = self.model.generate_content(prompt)
+                 return response.text
+            elif self.provider == 'huggingface':
+                # Re-use the generation logic
+                result = self._generate_huggingface(prompt, len(documents))
+                return result.get('answer', 'Error generating summary')
+                
         except Exception as e:
             return f"Error generating summary: {e}"
+        return "Provider error"

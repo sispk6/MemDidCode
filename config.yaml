@@ -8,9 +8,13 @@ embeddings:
   model_name: "sentence-transformers/all-MiniLM-L6-v2"
   dimension: 384
 
-
 llm:
-  model_name: "gemini-2.0-flash"
+  provider: "huggingface" # Options: "gemini", "huggingface"
+  # Gemini Configuration
+  # model_name: "gemini-2.0-flash"
+  # Hugging Face Configuration
+  model_name: "mistralai/Mistral-7B-Instruct-v0.2"
+  api_key_env_var: "HUGGINGFACE_API_KEY"
 
 storage:
   chromadb_path: "./data/chromadb"
