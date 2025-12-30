@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+memoenv/
+memoenv/Lib/
+memoenv/Scripts/
+memoenv/lib/
+memoenv/lib/python3.12/site-packages/
+memoenv/lib/python3.12/site-packages/
+build/
+dist/
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Environment
+.env
+.env.local
+
+# Data
+data/
+*.db
+*.sqlite
+chromadb/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.dbmemoenv/
+credentials.json
+token.json
+.env*
+*.key
+*.pem

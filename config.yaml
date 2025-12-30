@@ -1,0 +1,28 @@
+# config.yaml
+gmail:
+  credentials_file: "credentials.json"
+  token_file: "token.json"
+  max_results: 100
+
+embeddings:
+  model_name: "sentence-transformers/all-MiniLM-L6-v2"
+  dimension: 384
+
+storage:
+  chromadb_path: "./data/chromadb"
+  collection_name: "didi_messages"
+
+paths:
+  raw_data: "./data/raw"
+
+# MCP Configuration
+mcp:
+  enabled: true
+  default_mode: "legacy"  # Options: "legacy" or "mcp"
+  gmail:
+    use_mcp: false  # Set to true to use MCP by default
+
+# User Configuration (for metadata enhancements)
+user:
+  email: "you@example.com"  # Replace with your email for direction detection
+  name: "Your Name"         # Replace with your name

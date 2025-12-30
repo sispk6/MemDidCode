@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Did-I | Personal Memory Assistant</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body class="dark-mode">
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <h1>DidI<span>?</span></h1>
+            </div>
+
+            <nav class="nav-menu">
+                <button class="nav-item active" data-tab="search-tab">
+                    <span class="icon">🔍</span> Search
+                </button>
+                <button class="nav-item" data-tab="kb-tab">
+                    <span class="icon">👤</span> Identities
+                </button>
+                <button class="nav-item" data-tab="status-tab">
+                    <span class="icon">⚙️</span> Control Center
+                </button>
+            </nav>
+
+            <div class="stats-panel" id="stats-panel">
+                <p>Documents: <span id="doc-count">-</span></p>
+                <p>Platform: <span id="platform-name">-</span></p>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="content">
+            <!-- Search Tab -->
+            <section id="search-tab" class="tab-content active">
+                <header class="section-header">
+                    <h2>Memory Search</h2>
+                </header>
+
+                <div class="search-container">
+                    <div class="search-row">
+                        <input type="text" id="query-input" placeholder="What do you want to remember?">
+                        <button id="search-btn" class="btn-primary">Search</button>
+                    </div>
+
+                    <div class="filters-row">
+                        <select id="platform-filter">
+                            <option value="">All Platforms</option>
+                            <option value="gmail">Gmail</option>
+                            <option value="slack">Slack</option>
+                        </select>
+
+                        <select id="entity-filter">
+                            <option value="">All People</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Answer Section (RAG) -->
+                <div class="answer-container" id="answer-container" style="display: none;">
+                    <h3>💡 Answer</h3>
+                    <div class="answer-box" id="answer-box"></div>
+                    <div class="answer-meta" id="answer-meta"></div>
+                </div>
+
+                <!-- Results Section -->
+                <div class="results-container" id="results-container">
+                    <div class="empty-state">
+                        <p>Search your digital past above.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- KB Tab -->
+            <section id="kb-tab" class="tab-content">
+                <header class="section-header">
+                    <h2>Identity Registry</h2>
+                </header>
+                <div class="kb-grid" id="kb-entities-list">
+                    <!-- Entities will be loaded here -->
+                </div>
+            </section>
+
+            <!-- Status/Control Tab -->
+            <section id="status-tab" class="tab-content">
+                <header class="section-header">
+                    <h2>Control Center</h2>
+                </header>
+
+                <div class="control-grid">
+                    <div class="card action-card">
+                        <h3>Gmail Ingestion</h3>
+                        <p>Fetch latest messages from Gmail.</p>
+                        <div class="action-row">
+                            <select id="ingest-mode">
+                                <option value="legacy">Legacy Mode</option>
+                                <option value="mcp">MCP Mode</option>
+                            </select>
+                            <button id="ingest-btn" class="btn-secondary">Sync Now</button>
+                        </div>
+                    </div>
+
+                    <div class="card action-card">
+                        <h3>Embedding Pipeline</h3>
+                        <p>Process raw data and update vector index.</p>
+                        <button id="embed-btn" class="btn-secondary">Run Embedder</button>
+                    </div>
+                </div>
+
+                <div class="log-panel">
+                    <h3>Activity Log</h3>
+                    <div id="activity-log" class="log-content">
+                        [System] Dashboard ready.
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div id="modal-overlay" class="modal-overlay">
+        <div class="modal">
+            <div id="modal-content"></div>
+            <button class="close-modal">Close</button>
+        </div>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+
+</html>

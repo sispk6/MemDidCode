@@ -1,0 +1,29 @@
+# Core
+chromadb>=0.5.0
+sentence-transformers==2.3.1
+google-api-python-client==2.108.0
+google-auth-httplib2==0.2.0
+google-auth-oauthlib==1.2.0
+mcp>=1.0.0
+
+# Data processing
+beautifulsoup4==4.12.2
+pandas==2.1.4
+python-dateutil==2.8.2
+
+# Utilities
+python-dotenv==1.0.0
+pyyaml==6.0.1
+click==8.1.7
+
+# RAG / LLM
+google-generativeai>=0.3.0
+
+# Web Framework
+fastapi
+uvicorn
+
+# Development
+pytest==7.4.3
+black==23.12.1
+flake8==7.0.0
