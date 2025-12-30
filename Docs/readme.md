@@ -224,7 +224,7 @@ paths:
 - Make sure you ran `embed.py` after `ingest.py`
 - Check that ChromaDB has data: Look in `data/chromadb/` folder
 
----
+## here is mycode https://github.com/sispk6/MemDidCode.git
 
 ## 📊 Data Privacy
 
