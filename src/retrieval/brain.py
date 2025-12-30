@@ -3,6 +3,8 @@ RAG Brain - LLM-powered answer generation.
 Path: src/retrieval/brain.py
 """
 import os
+import yaml
+from pathlib import Path
 from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
 
@@ -13,16 +15,30 @@ load_dotenv()
 class RAGBrain:
     """Generate answers using LLM and retrieved contexts"""
     
-    def __init__(self, model_name: str = "gemini-1.5-flash"):
+    def __init__(self, model_name: Optional[str] = None):
         """
         Initialize RAG Brain with Gemini.
         
         Args:
-            model_name: Gemini model to use
+            model_name: Gemini model to use. If None, loads from config.yaml
         """
-        self.model_name = model_name
+        self.config = self._load_config()
+        self.model_name = model_name or self.config.get('llm', {}).get('model_name', "gemini-2.0-flash")
         self.model = None
         self._initialize_model()
+    
+    def _load_config(self) -> Dict[str, Any]:
+        """Load configuration from config.yaml"""
+        try:
+            # Assuming config.yaml is in the project root
+            # src/retrieval/brain.py -> src/retrieval -> src -> root
+            config_path = Path(__file__).resolve().parent.parent.parent / "config.yaml"
+            if config_path.exists():
+                with open(config_path, 'r') as f:
+                    return yaml.safe_load(f)
+        except Exception as e:
+            print(f"[WARN] Failed to load config.yaml: {e}")
+        return {}
     
     def _initialize_model(self):
         """Initialize Gemini model with API key"""
