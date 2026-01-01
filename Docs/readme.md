@@ -9,7 +9,7 @@ DidI? helps you remember:
 - "What did Alice say about the Q4 budget?"
 - "Did I respond to John's email about the meeting?"
 
-It uses AI embeddings to semantically search through your messages, not just keyword matching.
+It uses AI embeddings to semantically search through your messages and attachments, not just keyword matching.
 
 ---
 
