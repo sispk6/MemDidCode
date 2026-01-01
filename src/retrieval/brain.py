@@ -71,7 +71,8 @@ class RAGBrain:
     def _initialize_huggingface(self, config: Dict[str, Any]):
         """Initialize Hugging Face client"""
         self.hf_api_key = os.getenv(config.get('api_key_env_var', 'HUGGINGFACE_API_KEY'))
-        self.hf_api_url = f"https://api-inference.huggingface.co/models/{self.model_name}"
+        # Using the standard OpenAI-compatible endpoint provided by HF Router
+        self.hf_api_url = f"https://router.huggingface.co/hf-inference/models/{self.model_name}/v1/chat/completions"
         
         if not self.hf_api_key:
              print("[WARN] HUGGINGFACE_API_KEY not found. Inference will fail.")
@@ -116,34 +117,39 @@ class RAGBrain:
         }
 
     def _generate_huggingface(self, prompt: str, num_sources: int) -> Dict[str, Any]:
-        headers = {"Authorization": f"Bearer {self.hf_api_key}"}
-        
-        # Instruction formatting for chat models
-        formatted_prompt = f"<s>[INST] {prompt} [/INST]" 
-
-        payload = {
-            "inputs": formatted_prompt,
-            "parameters": {
-                "max_new_tokens": 512,
-                "temperature": 0.7,
-                "return_full_text": False
-            }
+        headers = {
+            "Authorization": f"Bearer {self.hf_api_key}",
+            "Content-Type": "application/json"
         }
         
-        response = requests.post(self.hf_api_url, headers=headers, json=payload)
+        # OpenAI Chat Completion format
+        messages = [
+            {"role": "user", "content": prompt}
+        ]
+
+        payload = {
+            "model": self.model_name,
+            "messages": messages,
+            "max_tokens": 512,
+            "temperature": 0.7
+        }
+        
+        # Note: The base URL for chat completions is often slightly different.
+        # Let's try the standard /v1/chat/completions on the router base
+        url = "https://router.huggingface.co/v1/chat/completions"
+        
+        response = requests.post(url, headers=headers, json=payload)
         
         if response.status_code != 200:
             raise Exception(f"Hugging Face API Error ({response.status_code}): {response.text}")
             
         result = response.json()
         
-        # Handle different response formats
-        if isinstance(result, list) and 'generated_text' in result[0]:
-            answer = result[0]['generated_text']
-        elif isinstance(result, dict) and 'generated_text' in result:
-             answer = result['generated_text']
+        # Parse OpenAI-format response
+        if 'choices' in result and len(result['choices']) > 0:
+            answer = result['choices'][0]['message']['content']
         else:
-             answer = str(result)
+            answer = str(result)
 
         return {
             "answer": answer.strip(),

@@ -13,7 +13,7 @@ llm:
   # Gemini Configuration
   # model_name: "gemini-2.0-flash"
   # Hugging Face Configuration
-  model_name: "mistralai/Mistral-7B-Instruct-v0.2"
+  model_name: "meta-llama/Meta-Llama-3-8B-Instruct"
   api_key_env_var: "HUGGINGFACE_API_KEY"
 
 storage:

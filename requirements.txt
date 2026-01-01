@@ -10,6 +10,8 @@ mcp>=1.0.0
 beautifulsoup4==4.12.2
 pandas==2.1.4
 python-dateutil==2.8.2
+pypdf
+python-docx
 
 # Utilities
 python-dotenv==1.0.0

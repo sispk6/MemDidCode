@@ -11,6 +11,9 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 import pickle
+import io
+from pypdf import PdfReader
+import docx
 
 from .base_connector import BaseConnector
 
@@ -168,6 +171,83 @@ class GmailConnector(BaseConnector):
     def _extract_subject(self, raw_message: Dict[str, Any]) -> str:
         headers = raw_message['payload']['headers']
         return next((h['value'] for h in headers if h['name'].lower() == 'subject'), '(No Subject)')
+    
+    def _extract_attachments(self, raw_message: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Extract and parse attachments from Gmail message"""
+        msg_id = raw_message['id']
+        payload = raw_message.get('payload', {})
+        attachments = []
+        
+        self._find_attachments(payload, msg_id, attachments)
+        return attachments
+
+    def _find_attachments(self, part: Dict[str, Any], msg_id: str, attachments: List[Dict[str, Any]]):
+        """Recursively find attachments in message parts"""
+        filename = part.get('filename')
+        body = part.get('body', {})
+        attachment_id = body.get('attachmentId')
+        
+        if filename and attachment_id:
+            mime_type = part.get('mimeType', '')
+            print(f"  [INFO] Found attachment: {filename} ({mime_type})")
+            
+            # Fetch attachment data
+            try:
+                attachment_data = self.service.users().messages().attachments().get(
+                    userId='me',
+                    messageId=msg_id,
+                    id=attachment_id
+                ).execute()
+                
+                raw_content = base64.urlsafe_b64decode(attachment_data['data'])
+                
+                # Parse content based on file extension or mime type
+                content = ""
+                if filename.lower().endswith('.pdf'):
+                    content = self._parse_pdf(raw_content)
+                elif filename.lower().endswith('.docx'):
+                    content = self._parse_docx(raw_content)
+                elif mime_type == 'text/plain':
+                    content = raw_content.decode('utf-8', errors='ignore')
+                
+                if content:
+                    attachments.append({
+                        "filename": filename,
+                        "mime_type": mime_type,
+                        "content": content
+                    })
+                    print(f"  [OK] Extracted {len(content)} chars from {filename}")
+                else:
+                    print(f"  [WARN] Could not extract text from {filename} (unsupported format or empty)")
+                    
+            except Exception as e:
+                print(f"  [ERROR] Failed to fetch/parse attachment {filename}: {e}")
+
+        # Recurse through sub-parts
+        if 'parts' in part:
+            for subpart in part['parts']:
+                self._find_attachments(subpart, msg_id, attachments)
+
+    def _parse_pdf(self, content_bytes: bytes) -> str:
+        """Extract text from PDF bytes"""
+        try:
+            reader = PdfReader(io.BytesIO(content_bytes))
+            text = ""
+            for page in reader.pages:
+                text += page.extract_text() + "\n"
+            return text.strip()
+        except Exception as e:
+            print(f"    [ERROR] PDF parsing failed: {e}")
+            return ""
+
+    def _parse_docx(self, content_bytes: bytes) -> str:
+        """Extract text from DOCX bytes"""
+        try:
+            doc = docx.Document(io.BytesIO(content_bytes))
+            return "\n".join([para.text for para in doc.paragraphs]).strip()
+        except Exception as e:
+            print(f"    [ERROR] DOCX parsing failed: {e}")
+            return ""
     
     def _extract_content(self, raw_message: Dict[str, Any]) -> str:
         """Extract email body (plain text preferred, HTML as fallback)"""

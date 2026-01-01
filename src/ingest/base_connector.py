@@ -67,6 +67,7 @@ class BaseConnector(ABC):
             "date": self._extract_date(raw_message),
             "subject": self._extract_subject(raw_message),
             "content": self._extract_content(raw_message),
+            "attachments": self._extract_attachments(raw_message),
             "thread_id": self._extract_thread_id(raw_message),
             "url": self._generate_url(raw_message),
             "raw_data": raw_message  # Keep original for reference
@@ -100,6 +101,16 @@ class BaseConnector(ABC):
     @abstractmethod
     def _extract_subject(self, raw_message: Dict[str, Any]) -> str:
         """Extract subject/title"""
+        pass
+    
+    @abstractmethod
+    def _extract_attachments(self, raw_message: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        Extract attachments from message.
+        
+        Returns:
+            List of dicts with 'filename', 'content' (extracted text), 'mime_type'
+        """
         pass
     
     @abstractmethod

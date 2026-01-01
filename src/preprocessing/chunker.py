@@ -68,45 +68,71 @@ class TextChunker:
     
     def chunk_message(self, message: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
-        Chunk a message and create separate records for each chunk.
+        Chunk a message and its attachments, creating separate linked records.
         
         Args:
-            message: Message dictionary with id, content, metadata
+            message: Message dictionary with id, content, metadata, and attachments
             
         Returns:
-            List of chunked message dictionaries
+            List of chunked dictionaries (main body chunks + attachment chunks)
         """
-        # Combine subject and content for chunking
+        original_id = message['id']
+        all_chunks = []
+        
+        # 1. Chunk the main body
         subject = message.get('subject', '')
         content = message.get('content', '')
         full_text = f"{subject}\n\n{content}" if subject else content
         
-        # Get chunks
         text_chunks = self.chunk_text(full_text)
-        
-        # If no chunking needed, return original
-        if len(text_chunks) <= 1:
-            return [message]
-        
-        # Create chunked messages
-        chunked_messages = []
-        original_id = message['id']
-        
         for idx, chunk in enumerate(text_chunks):
             chunked_msg = message.copy()
-            
-            # Update ID to include chunk index
+            # Clean up attachments from body chunks to save space/DB weight
+            if 'attachments' in chunked_msg:
+                del chunked_msg['attachments']
+                
             chunked_msg['id'] = f"{original_id}_chunk_{idx}"
-            
-            # Store chunk text
             chunked_msg['content'] = chunk
+            chunked_msg['embedding_text'] = chunk
             chunked_msg['chunk_index'] = idx
             chunked_msg['total_chunks'] = len(text_chunks)
             chunked_msg['original_id'] = original_id
+            chunked_msg['parent_id'] = original_id # Self-link for consistency
+            chunked_msg['source_type'] = 'email_body'
             
-            chunked_messages.append(chunked_msg)
+            all_chunks.append(chunked_msg)
+            
+        # 2. Chunk each attachment
+        attachments = message.get('attachments', [])
+        for att_idx, att in enumerate(attachments):
+            att_name = att.get('filename', 'unknown_attachment')
+            att_content = att.get('content', '')
+            
+            if not att_content:
+                continue
+                
+            att_text_chunks = self.chunk_text(att_content)
+            for chunk_idx, chunk in enumerate(att_text_chunks):
+                chunked_att = message.copy()
+                # Clean up attachments from its own chunk
+                if 'attachments' in chunked_att:
+                    del chunked_att['attachments']
+                
+                chunked_att['id'] = f"{original_id}_att_{att_idx}_chunk_{chunk_idx}"
+                chunked_att['content'] = chunk
+                chunked_att['chunk_index'] = chunk_idx
+                chunked_att['total_chunks'] = len(att_text_chunks)
+                chunked_att['original_id'] = original_id
+                chunked_att['parent_id'] = original_id # Link to parent email
+                chunked_att['source_type'] = 'attachment'
+                chunked_att['filename'] = att_name
+                
+                # Prepend filename for context in embedding if it's an attachment
+                chunked_att['embedding_text'] = f"Attachment: {att_name}\n\n{chunk}"
+                
+                all_chunks.append(chunked_att)
         
-        return chunked_messages
+        return all_chunks
     
     def chunk_messages(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
