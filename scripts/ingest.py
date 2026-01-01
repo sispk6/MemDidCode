@@ -29,14 +29,14 @@ def load_config():
         return yaml.safe_load(f)
 
 
-def parse_arguments():
+def parse_arguments(default_mode='mcp'):
     """Parse command line arguments"""
     parser = argparse.ArgumentParser(description='Ingest messages from Gmail')
     parser.add_argument(
         '--mode',
         choices=['legacy', 'mcp'],
-        default='legacy',
-        help='Connector mode: legacy (default) or mcp'
+        default=default_mode,
+        help=f'Connector mode: legacy or mcp (default: {default_mode})'
     )
     parser.add_argument(
         '--max-results',
@@ -48,16 +48,20 @@ def parse_arguments():
 
 
 def main():
+    # Load config first to get defaults
+    config = load_config()
+    mcp_config = config.get('mcp', {})
+    default_mode = mcp_config.get('default_mode', 'mcp')
+    
     # Parse arguments
-    args = parse_arguments()
+    args = parse_arguments(default_mode=default_mode)
     
     print("=" * 80)
     print(f"DidI? - Data Ingestion ({args.mode.upper()} mode)")
     print("=" * 80)
     print()
     
-    # Load config
-    config = load_config()
+    # Use loaded config
     gmail_config = config['gmail']
     paths_config = config['paths']
     

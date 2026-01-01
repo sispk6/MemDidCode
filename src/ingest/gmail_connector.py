@@ -10,6 +10,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
+from google.auth.exceptions import RefreshError
 import pickle
 import io
 from pypdf import PdfReader
@@ -48,7 +49,23 @@ class GmailConnector(BaseConnector):
         # If no valid credentials, let user log in
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
+                try:
+                    print("[INFO] Token expired. Attempting to refresh...")
+                    creds.refresh(Request())
+                except RefreshError:
+                    print("[WARN] Token could not be refreshed (it might have been revoked).")
+                    print(f"[INFO] Deleting invalid {token_file} and requesting new login...")
+                    if os.path.exists(token_file):
+                        os.remove(token_file)
+                    
+                    # Restart authentication flow
+                    if not os.path.exists(creds_file):
+                        print(f"[ERROR] {creds_file} not found!")
+                        return False
+                    
+                    flow = InstalledAppFlow.from_client_secrets_file(
+                        creds_file, self.SCOPES)
+                    creds = flow.run_local_server(port=0)
             else:
                 if not os.path.exists(creds_file):
                     print(f"[ERROR] {creds_file} not found!")
