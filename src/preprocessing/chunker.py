@@ -3,6 +3,7 @@ Text chunking utilities for long documents.
 Path: src/preprocessing/chunker.py
 """
 from typing import List, Dict, Any
+from src.preprocessing.semantic_cleaner import SemanticCleaner
 
 
 class TextChunker:
@@ -79,30 +80,29 @@ class TextChunker:
         original_id = message['id']
         all_chunks = []
         
-        # 1. Chunk the main body
+        # 1. Prepare Base Metadata (Avoid copying all attachments multiple times)
+        base_meta = {k: v for k, v in message.items() if k not in ['attachments', 'content', 'embedding_text']}
+        
+        # 2. Chunk the main body
         subject = message.get('subject', '')
         content = message.get('content', '')
         full_text = f"{subject}\n\n{content}" if subject else content
         
         text_chunks = self.chunk_text(full_text)
         for idx, chunk in enumerate(text_chunks):
-            chunked_msg = message.copy()
-            # Clean up attachments from body chunks to save space/DB weight
-            if 'attachments' in chunked_msg:
-                del chunked_msg['attachments']
-                
+            chunked_msg = base_meta.copy()
             chunked_msg['id'] = f"{original_id}_chunk_{idx}"
             chunked_msg['content'] = chunk
             chunked_msg['embedding_text'] = chunk
             chunked_msg['chunk_index'] = idx
             chunked_msg['total_chunks'] = len(text_chunks)
             chunked_msg['original_id'] = original_id
-            chunked_msg['parent_id'] = original_id # Self-link for consistency
+            chunked_msg['parent_id'] = original_id
             chunked_msg['source_type'] = 'email_body'
             
             all_chunks.append(chunked_msg)
             
-        # 2. Chunk each attachment
+        # 3. Chunk each attachment (with Semantic Cleaning)
         attachments = message.get('attachments', [])
         for att_idx, att in enumerate(attachments):
             att_name = att.get('filename', 'unknown_attachment')
@@ -111,26 +111,28 @@ class TextChunker:
             if not att_content:
                 continue
                 
-            att_text_chunks = self.chunk_text(att_content)
+            # --- SEMANTIC CLEANING ---
+            cleaned_content = SemanticCleaner.clean(att_content)
+            # -------------------------
+            
+            att_text_chunks = self.chunk_text(cleaned_content)
             for chunk_idx, chunk in enumerate(att_text_chunks):
-                chunked_att = message.copy()
-                # Clean up attachments from its own chunk
-                if 'attachments' in chunked_att:
-                    del chunked_att['attachments']
-                
+                chunked_att = base_meta.copy()
                 chunked_att['id'] = f"{original_id}_att_{att_idx}_chunk_{chunk_idx}"
                 chunked_att['content'] = chunk
                 chunked_att['chunk_index'] = chunk_idx
                 chunked_att['total_chunks'] = len(att_text_chunks)
                 chunked_att['original_id'] = original_id
-                chunked_att['parent_id'] = original_id # Link to parent email
+                chunked_att['parent_id'] = original_id
                 chunked_att['source_type'] = 'attachment'
                 chunked_att['filename'] = att_name
                 
-                # Prepend filename for context in embedding if it's an attachment
+                # Prepend filename for context in embedding
                 chunked_att['embedding_text'] = f"Attachment: {att_name}\n\n{chunk}"
                 
                 all_chunks.append(chunked_att)
+        
+        return all_chunks
         
         return all_chunks
     
