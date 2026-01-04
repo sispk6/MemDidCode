@@ -1,10 +1,10 @@
-# DidI? - Personal Memory Assistant
+# Did-I - Personal Memory Assistant
 
 Your personal AI-powered memory that remembers everything across Gmail (and soon Slack, Calendar, etc.)
 
 ## 🎯 What It Does
 
-DidI? helps you remember:
+Did-I helps you remember:
 - "When did I agree to send that report?"
 - "What did Alice say about the Q4 budget?"
 - "Did I respond to John's email about the meeting?"
@@ -25,7 +25,7 @@ It uses AI embeddings to semantically search through your messages and attachmen
 
 ### 1. Set Up Gmail API Credentials
 
-Before you can use DidI?, you need to set up Gmail API access:
+Before you can use Did-I, you need to set up Gmail API access:
 
 #### **Step 1: Create a Google Cloud Project**
 

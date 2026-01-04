@@ -119,7 +119,7 @@ def main():
     args = parser.parse_args()
 
     print("=" * 80)
-    print("DidI? - Embedding Generation & Storage (Memory Optimized)")
+    print("Did-I - Embedding Generation & Storage (Memory Optimized)")
     print("=" * 80)
     print(f"[CONFIG] Sub-batch size: {args.batch_size}")
     print()

@@ -63,7 +63,7 @@ def main():
     args = parse_arguments(default_mode=default_mode)
     
     print("=" * 80)
-    print(f"DidI? - Data Ingestion ({args.mode.upper()} mode)")
+    print(f"DidI - Data Ingestion ({args.mode.upper()} mode)")
     print("=" * 80)
     print()
     

@@ -1,5 +1,5 @@
 """
-DidI? Dashboard Starter
+Did-I Dashboard Starter
 Run this script to launch the standalone web interface.
 Usage: python start_ui.py
 """
@@ -19,7 +19,7 @@ def main():
         sys.exit(1)
 
     print("-" * 50)
-    print("      DidI? Personal Memory Assistant UI")
+    print("      Did-I Personal Memory Assistant UI")
     print("-" * 50)
     print("Launching dashboard...")
     print("URL: http://localhost:8000")

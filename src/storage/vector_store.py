@@ -36,7 +36,7 @@ class VectorStore:
         # Get or create collection
         self.collection = self.client.get_or_create_collection(
             name=collection_name,
-            metadata={"description": "DidI? Personal Memory Assistant messages"}
+            metadata={"description": "Did-I Personal Memory Assistant messages"}
         )
         
         print(f"[OK] ChromaDB initialized. Collection: {collection_name}")
@@ -263,7 +263,7 @@ class VectorStore:
             self.client.delete_collection(name=self.collection_name)
             self.collection = self.client.create_collection(
                 name=self.collection_name,
-                metadata={"description": "DidI? Personal Memory Assistant messages"}
+                metadata={"description": "Did-I Personal Memory Assistant messages"}
             )
             print(f"[OK] Cleared collection: {self.collection_name}")
             return True

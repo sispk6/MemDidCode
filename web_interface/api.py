@@ -25,7 +25,7 @@ def load_config():
     with open(config_path, 'r') as f:
         return yaml.safe_load(f)
 
-app = FastAPI(title="DidI? Personal Memory Assistant")
+app = FastAPI(title="Did-I Personal Memory Assistant")
 
 # Mount static files
 static_dir = Path(__file__).parent / "static"

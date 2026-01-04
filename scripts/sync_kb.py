@@ -23,7 +23,7 @@ def load_config():
 
 def main():
     print("=" * 80)
-    print("DidI? - Knowledge Base Identity Sync (Incremental)")
+    print("Did-I - Knowledge Base Identity Sync (Incremental)")
     print("=" * 80)
     print()
 

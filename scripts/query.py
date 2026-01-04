@@ -39,7 +39,7 @@ def main():
     query = " ".join(sys.argv[1:])
     
     print("=" * 80)
-    print("DidI? - Personal Memory Search")
+    print("Did-I - Personal Memory Search")
     print("=" * 80)
     print()
     

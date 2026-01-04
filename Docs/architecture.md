@@ -1,6 +1,6 @@
 Architectural Improvement Proposal
 Goal Description
-Enhance the current "DidI?" architecture to be more robust, scalable, and maintainable. The current script-based approach works for a prototype but needs evolution for a production-grade personal assistant.
+Enhance the current "Did-I" architecture to be more robust, scalable, and maintainable. The current script-based approach works for a prototype but needs evolution for a production-grade personal assistant.
 
 Proposed Improvements
 1. Incremental Ingestion Strategy
