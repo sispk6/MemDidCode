@@ -17,6 +17,7 @@ python-docx
 python-dotenv==1.0.0
 pyyaml==6.0.1
 click==8.1.7
+tenacity>=8.2.0
 
 # RAG / LLM
 google-generativeai>=0.3.0

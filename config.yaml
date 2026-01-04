@@ -23,6 +23,10 @@ storage:
 paths:
   raw_data: "./data/raw"
 
+chunking:
+  chunk_size: 2000
+  overlap: 200
+
 # MCP Configuration
 mcp:
   enabled: true

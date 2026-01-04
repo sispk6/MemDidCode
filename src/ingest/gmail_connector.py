@@ -15,8 +15,12 @@ import pickle
 import io
 from pypdf import PdfReader
 import docx
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type, before_sleep_log
+import logging
 
 from .base_connector import BaseConnector
+
+logger = logging.getLogger(__name__)
 
 
 class GmailConnector(BaseConnector):
@@ -85,6 +89,12 @@ class GmailConnector(BaseConnector):
         print("[OK] Gmail authentication successful!")
         return True
     
+    @retry(
+        stop=stop_after_attempt(5),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception_type((RefreshError, ConnectionError, TimeoutError, Exception)),
+        before_sleep=before_sleep_log(logger, logging.WARNING)
+    )
     def fetch_messages(self, max_results: int = 100, since_date: str = None, since_id: str = None) -> List[Dict[str, Any]]:
         """
         Fetch emails from Gmail with optional incremental filtering.
@@ -221,6 +231,12 @@ class GmailConnector(BaseConnector):
         headers = raw_message['payload']['headers']
         return next((h['value'] for h in headers if h['name'].lower() == 'subject'), '(No Subject)')
     
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=5),
+        retry=retry_if_exception_type((Exception)),
+        before_sleep=before_sleep_log(logger, logging.WARNING)
+    )
     def _extract_attachments(self, raw_message: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Extract and parse attachments from Gmail message"""
         msg_id = raw_message['id']

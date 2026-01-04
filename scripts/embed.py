@@ -130,8 +130,9 @@ def main():
     storage_config = config['storage']
     paths_config = config['paths']
     
-    # Initialize StateManager
-    state_mgr = StateManager()
+    # Initialize StateManager with auto_save=False for performance
+    # We will save manually after each batch or at the end
+    state_mgr = StateManager(auto_save=False)
     
     # Force reload of preprocessing modules to get latest code
     import sys
@@ -145,7 +146,14 @@ def main():
     
     # Initialize components
     print("Step 1: Initializing components...")
-    chunker = TextChunker(chunk_size=2000, overlap=200)
+    
+    # Get chunking config with defaults
+    chunk_config = config.get('chunking', {})
+    chunk_size = chunk_config.get('chunk_size', 2000)
+    chunk_overlap = chunk_config.get('overlap', 200)
+    print(f"[CONFIG] Chunking: size={chunk_size}, overlap={chunk_overlap}")
+    
+    chunker = TextChunker(chunk_size=chunk_size, overlap=chunk_overlap)
     embedder = Embedder(model_name=embeddings_config['model_name'])
     vector_store = VectorStore(
         persist_directory=storage_config['chromadb_path'],
@@ -179,9 +187,18 @@ def main():
             print(f"  [ERROR] Failed to process {f.name}")
             break
         
+        # Periodically save state (every 5 files) to prevent data loss in case of crash
+        if processed_count % 5 == 0:
+            state_mgr.save()
+            print("  [INFO] State saved to disk", flush=True)
+            
         # Explicitly clear memory between files
         gc.collect()
-        print("-" * 40)
+        print("-" * 40, flush=True)
+    
+    # Final save
+    state_mgr.save()
+    print("[INFO] Final state saved to disk", flush=True)
     
     # Show stats
     stats = vector_store.get_stats()
