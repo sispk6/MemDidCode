@@ -22,9 +22,17 @@ class SemanticCleaner:
         """
         if not text:
             return ""
-            
-        text_size_kb = len(text.encode('utf-8')) / 1024
         
+        text_size_kb = len(text.encode('utf-8')) / 1024
+        line_count = text.count('\n')
+        print(f"    [DEBUG] SemanticCleaner.clean: {text_size_kb:.1f}KB, {line_count} lines", flush=True)
+            
+        # Hard limit: if text is over 5MB, truncate immediately before any processing
+        # to avoid OOM during regex or splitting
+        if len(text) > 5 * 1024 * 1024:
+            text = text[:1024 * 1024] + "\n... [TRUNCATED DUE TO EXTREME SIZE] ...\n"
+            print(f"    [WARN] Truncated text from 5MB+ to 1MB", flush=True)
+
         # 1. Basic Cleaning (always do this)
         text = SemanticCleaner.remove_noise(text)
         
@@ -34,9 +42,11 @@ class SemanticCleaner:
         # 3. Tiered Strategy
         if text_size_kb > 300:
             # Oversized: Selective Extraction
+            print(f"    [INFO] Large attachment (>300KB), extracting key sections", flush=True)
             return SemanticCleaner.extract_key_sections(text)
         elif text_size_kb > max_size_kb:
             # Large: Aggressive Cleaning
+            print(f"    [INFO] Medium attachment (>{max_size_kb}KB), aggressive cleaning", flush=True)
             return SemanticCleaner.aggressive_clean(text)
             
         return text
@@ -44,7 +54,15 @@ class SemanticCleaner:
     @staticmethod
     def remove_noise(text: str) -> str:
         """Remove obvious noise like page numbers and navigation artifacts."""
+        print(f"    [DEBUG] remove_noise starting...", flush=True)
         lines = text.split('\n')
+        
+        # Performance guard: Skip expensive regex on very large texts
+        if len(lines) > 100000:
+            print(f"    [WARN] Skipping noise removal (too many lines: {len(lines)})", flush=True)
+            return text
+        
+        print(f"    [DEBUG] remove_noise processing {len(lines)} lines", flush=True)
         cleaned_lines = []
         
         for line in lines:
@@ -56,34 +74,53 @@ class SemanticCleaner:
             if len(line) < 2 and not line.isalnum():
                 continue
             cleaned_lines.append(line)
-            
+        
+        print(f"    [DEBUG] remove_noise done, kept {len(cleaned_lines)} lines", flush=True)
         return '\n'.join(cleaned_lines)
 
     @staticmethod
     def remove_repeated_lines(text: str) -> str:
         """Remove lines that repeat frequently (likely headers/footers)."""
+        print(f"    [DEBUG] remove_repeated_lines starting...", flush=True)
         lines = text.split('\n')
-        if len(lines) < 20:
+        
+        # Performance guard: Skip this expensive operation on very large texts
+        # (likely data dumps that don't benefit from this cleaning)
+        if len(lines) > 50000:
+            print(f"    [WARN] Skipping repeated line removal (too many lines: {len(lines)})", flush=True)
             return text
             
+        if len(lines) < 20:
+            print(f"    [DEBUG] Too few lines ({len(lines)}), skipping", flush=True)
+            return text
+        
+        print(f"    [DEBUG] remove_repeated_lines processing {len(lines)} lines", flush=True)
         line_counts = {}
         for line in lines:
             line = line.strip()
             if len(line) > 10: # Only track meaningful lines
                 line_counts[line] = line_counts.get(line, 0) + 1
         
-        # Identify lines that appear more than 3 times (headers/footers usually repeat on every page)
+        # Identify lines that appear more than 5 times (headers/footers usually repeat on every page)
         boilerplate = {line for line, count in line_counts.items() if count > 5}
         
         if not boilerplate:
+            print(f"    [DEBUG] No boilerplate found", flush=True)
             return text
-            
+        
+        print(f"    [DEBUG] Removing {len(boilerplate)} boilerplate lines", flush=True)
         return '\n'.join([l for l in lines if l.strip() not in boilerplate])
 
     @staticmethod
     def aggressive_clean(text: str) -> str:
         """More aggressive filtering for large files."""
         lines = text.split('\n')
+        
+        # Performance guard
+        if len(lines) > 100000:
+            print(f"    [WARN] Text too large for aggressive clean ({len(lines)} lines), truncating first")
+            lines = lines[:50000]  # Process only first 50k lines
+            
         cleaned = []
         for line in lines:
             line = line.strip()

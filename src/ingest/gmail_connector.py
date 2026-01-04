@@ -85,26 +85,33 @@ class GmailConnector(BaseConnector):
         print("[OK] Gmail authentication successful!")
         return True
     
-    def fetch_messages(self, max_results: int = 100) -> List[Dict[str, Any]]:
+    def fetch_messages(self, max_results: int = 100, since_date: str = None, since_id: str = None) -> List[Dict[str, Any]]:
         """
-        Fetch emails from Gmail.
-        
-        Args:
-            max_results: Maximum number of emails to fetch
-            
-        Returns:
-            List of normalized message dictionaries
+        Fetch emails from Gmail with optional incremental filtering.
         """
         if not self.service:
             raise Exception("Not authenticated. Call authenticate() first.")
         
+        query = ""
+        if since_date:
+            try:
+                # Gmail query 'after' expects YYYY/MM/DD, so we do local filtering for precision
+                # but we can at least limit the search window if it's broad
+                dt = datetime.fromisoformat(since_date.split('.')[0].replace('Z', '+00:00'))
+                # Query roughly for messages after that date to narrow it down
+                query = f"after:{dt.strftime('%Y/%m/%d')}"
+                print(f"[INFO] Using Gmail query: {query}")
+            except Exception as e:
+                print(f"[WARN] Failed to parse since_date {since_date}: {e}")
+
         print(f"[INFO] Fetching up to {max_results} emails from Gmail...")
         
         try:
             # Get message IDs
             results = self.service.users().messages().list(
                 userId='me',
-                maxResults=max_results
+                maxResults=max_results,
+                q=query
             ).execute()
             
             messages = results.get('messages', [])
@@ -113,18 +120,39 @@ class GmailConnector(BaseConnector):
                 print("No messages found.")
                 return []
             
-            print(f"Found {len(messages)} messages. Fetching details...")
+            print(f"Found {len(messages)} messages in initial list. Filtering and fetching details...")
             
             # Fetch full message details
             detailed_messages = []
+            
+            # Convert since_date to timestamp for comparison if present
+            since_ts = 0
+            if since_date:
+                try:
+                    since_ts = datetime.fromisoformat(since_date.split('.')[0].replace('Z', '+00:00')).timestamp() * 1000
+                except: pass
+
             for i, msg in enumerate(messages, 1):
                 try:
+                    # Skip if it's the since_id
+                    if since_id and f"gmail_{msg['id']}" == since_id:
+                        print(f"  [INFO] Reached last processed message ID: {since_id}. Stopping.")
+                        break
+
                     full_msg = self.service.users().messages().get(
                         userId='me',
                         id=msg['id'],
                         format='full'
                     ).execute()
                     
+                    # Check internalDate for precision
+                    msg_ts = int(full_msg['internalDate'])
+                    if since_ts and msg_ts <= since_ts:
+                        # Message is older or equal to our last checkpoint
+                        # Note: We continue to be safe, but typically Gmail list is reverse chrono
+                        # so we could probably break here.
+                        continue
+
                     normalized = self.normalize_message(full_msg)
                     detailed_messages.append(normalized)
                     
@@ -135,7 +163,11 @@ class GmailConnector(BaseConnector):
                     print(f"  [WARN] Error fetching message {msg['id']}: {e}")
                     continue
             
-            print(f"[OK] Successfully fetched {len(detailed_messages)} messages")
+            # Sort by date ascending (oldest first) so that the last one processed is the newest
+            # This makes updating state easier if we process in batches
+            detailed_messages.sort(key=lambda x: x['date'])
+
+            print(f"[OK] Successfully fetched {len(detailed_messages)} new messages")
             return detailed_messages
             
         except Exception as e:
@@ -205,8 +237,21 @@ class GmailConnector(BaseConnector):
         attachment_id = body.get('attachmentId')
         
         if filename and attachment_id:
+            size = body.get('size', 0)
             mime_type = part.get('mimeType', '')
-            print(f"  [INFO] Found attachment: {filename} ({mime_type})")
+            
+            # 1. Skip very large attachments (> 25MB) to avoid OOM or timeouts
+            if size > 25 * 1024 * 1024:
+                print(f"  [WARN] Skipping {filename} - too large ({size / 1024 / 1024:.1f} MB)")
+                return
+
+            # 2. Skip unsupported compressed or binary formats
+            unsupported_exts = ['.rar', '.zip', '.7z', '.exe', '.dll', '.bin', '.iso', '.dmg']
+            if any(filename.lower().endswith(ext) for ext in unsupported_exts):
+                print(f"  [INFO] Skipping {filename} - unsupported format")
+                return
+
+            print(f"  [INFO] Processing attachment: {filename} ({mime_type}, {size} bytes)")
             
             # Fetch attachment data
             try:
@@ -220,11 +265,13 @@ class GmailConnector(BaseConnector):
                 
                 # Parse content based on file extension or mime type
                 content = ""
-                if filename.lower().endswith('.pdf'):
+                ext = Path(filename).suffix.lower()
+                
+                if ext == '.pdf':
                     content = self._parse_pdf(raw_content)
-                elif filename.lower().endswith('.docx'):
+                elif ext in ['.docx', '.doc']:
                     content = self._parse_docx(raw_content)
-                elif mime_type == 'text/plain':
+                elif mime_type == 'text/plain' or ext in ['.txt', '.md', '.csv']:
                     content = raw_content.decode('utf-8', errors='ignore')
                 
                 if content:

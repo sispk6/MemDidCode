@@ -20,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.ingest.gmail_connector import GmailConnector
 from src.ingest.mcp_gmail_connector import MCPGmailConnector
+from src.utils.state_manager import StateManager
 
 
 def load_config():
@@ -44,6 +45,11 @@ def parse_arguments(default_mode='mcp'):
         default=None,
         help='Maximum number of messages to fetch (overrides config)'
     )
+    parser.add_argument(
+        '--full',
+        action='store_true',
+        help='Force full ingestion (ignore last state)'
+    )
     return parser.parse_args()
 
 
@@ -60,6 +66,9 @@ def main():
     print(f"DidI? - Data Ingestion ({args.mode.upper()} mode)")
     print("=" * 80)
     print()
+    
+    # Initialize StateManager
+    state_mgr = StateManager()
     
     # Use loaded config
     gmail_config = config['gmail']
@@ -78,6 +87,20 @@ def main():
         connector = GmailConnector(gmail_config)
         use_mcp = False
     
+    platform = connector.platform_name
+    
+    # Get last state if not doing a full ingest
+    since_date = None
+    since_id = None
+    if not args.full:
+        state = state_mgr.get_state("ingestion", platform, {})
+        since_date = state.get("last_date")
+        since_id = state.get("last_id")
+        if since_date:
+            print(f"[INFO] Performing incremental ingest since {since_date}")
+    else:
+        print("[INFO] Performing FULL ingest (ignoring state)")
+
     # Authenticate
     print("Step 1: Authenticating with Gmail...")
     if use_mcp:
@@ -96,12 +119,20 @@ def main():
     print(f"Step 2: Fetching up to {max_results} messages...")
     if use_mcp:
         # MCP connector has sync wrapper for backward compatibility
-        messages = connector.fetch_messages_sync(max_results=max_results)
+        messages = connector.fetch_messages_sync(
+            max_results=max_results, 
+            since_date=since_date, 
+            since_id=since_id
+        )
     else:
-        messages = connector.fetch_messages(max_results=max_results)
+        messages = connector.fetch_messages(
+            max_results=max_results,
+            since_date=since_date,
+            since_id=since_id
+        )
     
     if not messages:
-        print("No messages fetched. Exiting.")
+        print("No new messages fetched.")
         return
     
     print()
@@ -114,12 +145,21 @@ def main():
     
     connector.save_raw_data(messages, str(output_path))
     
+    # Update state with the newest message from this batch
+    # Since we sorted them ascending in the connector, the last one is the newest
+    newest_msg = messages[-1]
+    state_mgr.update_state("ingestion", platform, {
+        "last_date": newest_msg['date'],
+        "last_id": newest_msg['id']
+    })
+    
     print()
     print("=" * 80)
-    print("✅ Ingestion complete!")
+    print("[OK] Ingestion complete!")
     print(f"   Mode: {args.mode.upper()}")
     print(f"   Messages fetched: {len(messages)}")
     print(f"   Saved to: {output_path}")
+    print(f"   Updated state: {newest_msg['date']}")
     print("=" * 80)
     print()
     print("Next step: Run 'python scripts/embed.py' to generate embeddings")

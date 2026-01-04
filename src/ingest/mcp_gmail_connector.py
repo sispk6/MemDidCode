@@ -44,18 +44,12 @@ class MCPGmailConnector(MCPConnectorBase):
         # The existing connector is synchronous, so we just call it directly
         return self.gmail_connector.authenticate()
     
-    async def fetch_messages(self, max_results: int = 100) -> List[Dict[str, Any]]:
+    async def fetch_messages(self, max_results: int = 100, since_date: str = None, since_id: str = None) -> List[Dict[str, Any]]:
         """
         Fetch messages from Gmail.
-        
-        Args:
-            max_results: Maximum number of messages to fetch
-            
-        Returns:
-            List of normalized message dictionaries
         """
         # The existing connector is synchronous, so we just call it directly
-        return self.gmail_connector.fetch_messages(max_results)
+        return self.gmail_connector.fetch_messages(max_results, since_date, since_id)
     
     async def search_messages(self, query: str, max_results: int = 10) -> List[Dict[str, Any]]:
         """
@@ -112,9 +106,9 @@ class MCPGmailConnector(MCPConnectorBase):
         """Synchronous authentication (backward compatible)"""
         return self.gmail_connector.authenticate()
     
-    def fetch_messages_sync(self, max_results: int = 100) -> List[Dict[str, Any]]:
+    def fetch_messages_sync(self, max_results: int = 100, since_date: str = None, since_id: str = None) -> List[Dict[str, Any]]:
         """Synchronous message fetching (backward compatible)"""
-        return self.gmail_connector.fetch_messages(max_results)
+        return self.gmail_connector.fetch_messages(max_results, since_date, since_id)
     
     def save_raw_data(self, messages: List[Dict[str, Any]], output_path: str):
         """Save raw messages to JSON file (backward compatible)"""

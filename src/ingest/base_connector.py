@@ -36,12 +36,14 @@ class BaseConnector(ABC):
         pass
     
     @abstractmethod
-    def fetch_messages(self, max_results: int = 100) -> List[Dict[str, Any]]:
+    def fetch_messages(self, max_results: int = 100, since_date: str = None, since_id: str = None) -> List[Dict[str, Any]]:
         """
         Fetch messages from the platform.
         
         Args:
             max_results: Maximum number of messages to fetch
+            since_date: ISO format date to fetch messages from
+            since_id: Last processed message ID
             
         Returns:
             List of message dictionaries in universal format
