@@ -7,6 +7,7 @@ Your personal AI-powered memory that remembers everything across Gmail messages 
    - stores metadata for filter based search
    - Keeps identities across Apps
    - loads missing/new data incrementally
+   - Knowledge Graph
 
 ## 🎯 What It Does
 
