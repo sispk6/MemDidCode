@@ -4,6 +4,8 @@ Your personal AI-powered memory that remembers everything across Gmail messages 
    - local data storage
    - searches mails and attachments semantically
    - stores metadata for filter based search
+   - Keeps identities across Apps
+   - loads missing data incrementally
 
 ## 🎯 What It Does
 
