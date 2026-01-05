@@ -246,7 +246,6 @@ paths:
 - [ ] Add Slack integration
 - [ ] Add date/decision extraction
 - [ ] Build browser extension UI
-- [ ] Add incremental updates
 - [ ] Multi-user support
 
 ---
