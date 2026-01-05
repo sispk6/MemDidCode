@@ -3,7 +3,7 @@
 Your personal AI-powered memory that remembers everything across Gmail messages and attachments (pdf/docs initially), (and soon Slack, Calendar, etc.)
    - local data storage
    - searches mails and attachments semantically
-   - 
+   - stores metadata for filter based search
 
 ## 🎯 What It Does
 
