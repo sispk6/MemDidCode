@@ -1,0 +1,42 @@
+# config_standalone.yaml
+# Configuration for Standalone Web Mode (Local Desktop)
+
+gmail:
+  credentials_file: "credentials.json"
+  token_file: "token.json"
+  max_results: 100
+
+embeddings:
+  model_name: "sentence-transformers/all-MiniLM-L6-v2"
+  dimension: 384
+
+llm:
+  provider: "huggingface" # Options: "gemini", "huggingface"
+  # Gemini Configuration
+  # model_name: "gemini-2.0-flash"
+  # Hugging Face Configuration
+  model_name: "meta-llama/Meta-Llama-3-8B-Instruct"
+  api_key_env_var: "HUGGINGFACE_API_KEY"
+
+storage:
+  chromadb_path: "./data/chromadb"
+  collection_name: "didi_messages"
+
+paths:
+  raw_data: "./data/raw"
+
+chunking:
+  chunk_size: 2000
+  overlap: 200
+
+# MCP Configuration
+mcp:
+  enabled: true
+  default_mode: "mcp"  # Options: "legacy" or "mcp"
+  gmail:
+    use_mcp: true  # Set to true to use MCP by default
+
+# User Configuration (for metadata enhancements)
+user:
+  email: "you@example.com"  # Replace with your email for direction detection
+  name: "Your Name"         # Replace with your name

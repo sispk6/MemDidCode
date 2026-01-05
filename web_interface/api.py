@@ -18,12 +18,10 @@ from src.embeddings.embedder import Embedder
 from src.retrieval.search import SearchEngine
 from src.retrieval.brain import RAGBrain
 from src.storage.knowledge_base import KnowledgeBase
+from src.ingest.gmail_connector import GmailConnector
+from src.utils.config_loader import load_config
 
-def load_config():
-    """Load configuration from config.yaml"""
-    config_path = root_path / "config.yaml"
-    with open(config_path, 'r') as f:
-        return yaml.safe_load(f)
+
 
 app = FastAPI(title="Did-I Personal Memory Assistant")
 
@@ -167,3 +165,55 @@ async def get_stats():
         return stats
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# Auth Endpoints
+@app.get("/api/auth/status")
+async def get_auth_status():
+    """Check if the user is authenticated (token.json exists)"""
+    gmail_config = config.get('gmail', {})
+    token_file = gmail_config.get('token_file', 'token.json')
+    
+    # Resolve against project root if relative
+    if not os.path.isabs(token_file):
+        token_file = root_path / token_file
+    else:
+        token_file = Path(token_file)
+        
+    is_authenticated = token_file.exists()
+    return {"authenticated": is_authenticated}
+
+@app.post("/api/auth/login")
+async def login():
+    """Trigger Gmail authentication flow (opens browser on server)"""
+    try:
+        gmail_config = config.get('gmail', {})
+        connector = GmailConnector(gmail_config)
+        
+        # This will open the browser locally
+        success = connector.authenticate()
+        
+        if success:
+            return {"status": "success", "message": "Authentication successful"}
+        else:
+            raise HTTPException(status_code=401, detail="Authentication failed")
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/auth/logout")
+async def logout():
+    """Log out by deleting the token file"""
+    gmail_config = config.get('gmail', {})
+    token_file = gmail_config.get('token_file', 'token.json')
+    
+    if not os.path.isabs(token_file):
+        token_file = root_path / token_file
+    else:
+        token_file = Path(token_file)
+        
+    if token_file.exists():
+        os.remove(token_file)
+        return {"status": "success", "message": "Logged out"}
+    else:
+        return {"status": "success", "message": "Already logged out"}
+

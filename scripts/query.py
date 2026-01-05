@@ -16,13 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.embeddings.embedder import Embedder
 from src.storage.vector_store import VectorStore
 from src.retrieval.search import SearchEngine
-
-
-def load_config():
-    """Load configuration from config.yaml"""
-    config_path = Path(__file__).parent.parent / "config.yaml"
-    with open(config_path, 'r') as f:
-        return yaml.safe_load(f)
+from src.utils.config_loader import load_config
 
 
 def main():

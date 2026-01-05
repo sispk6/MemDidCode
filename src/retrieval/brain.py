@@ -8,6 +8,8 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+from src.utils.config_loader import load_config
+
 
 class RAGBrain:
     """Generate answers using LLM and retrieved contexts"""
@@ -19,7 +21,7 @@ class RAGBrain:
         Args:
             model_name: Model to use. If None, loads from config.yaml
         """
-        self.config = self._load_config()
+        self.config = load_config()
         llm_config = self.config.get('llm', {})
         
         # Determine provider and model
@@ -39,16 +41,7 @@ class RAGBrain:
             self.provider = 'gemini'
             self._initialize_gemini()
 
-    def _load_config(self) -> Dict[str, Any]:
-        """Load configuration from config.yaml"""
-        try:
-            config_path = Path(__file__).resolve().parent.parent.parent / "config.yaml"
-            if config_path.exists():
-                with open(config_path, 'r') as f:
-                    return yaml.safe_load(f)
-        except Exception as e:
-            print(f"[WARN] Failed to load config.yaml: {e}")
-        return {}
+
     
     def _initialize_gemini(self):
         """Initialize Gemini model with API key"""

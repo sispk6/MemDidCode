@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Did-I | Quick Setup</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --background: #0f172a;
+            --surface: #1e293b;
+            --text: #f8fafc;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--background);
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .card {
+            background-color: var(--surface);
+            padding: 3rem;
+            border-radius: 1rem;
+            text-align: center;
+            max-width: 400px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+        }
+
+        h1 {
+            margin-bottom: 0.5rem;
+        }
+
+        p {
+            color: #94a3b8;
+            margin-bottom: 2rem;
+        }
+
+        .btn {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 0.5rem;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            width: 100%;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .status {
+            margin-top: 1rem;
+            font-size: 0.9rem;
+            min-height: 1.5rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="card">
+        <h1>Welcome to Did-I</h1>
+        <p>Your Personal Memory Assistant</p>
+
+        <div style="margin-bottom: 2rem;">
+            Before we start, we need to connect to your Gmail account to build your memory.
+        </div>
+
+        <button id="connect-btn" class="btn">Connect Gmail</button>
+        <div id="status" class="status"></div>
+    </div>
+
+    <script>
+        const btn = document.getElementById('connect-btn');
+        const status = document.getElementById('status');
+
+        // Check if already authenticated
+        fetch('/api/auth/status')
+            .then(res => res.json())
+            .then(data => {
+                if (data.authenticated) {
+                    window.location.href = '/';
+                }
+            });
+
+        btn.addEventListener('click', async () => {
+            btn.disabled = true;
+            btn.innerText = "Connecting...";
+            status.innerText = "A browser window will open. Please log in.";
+
+            try {
+                const res = await fetch('/api/auth/login', { method: 'POST' });
+                if (res.ok) {
+                    status.innerText = "Success! Redirecting...";
+                    setTimeout(() => window.location.href = '/', 1000);
+                } else {
+                    const data = await res.json();
+                    status.innerText = "Error: " + data.detail;
+                    btn.disabled = false;
+                    btn.innerText = "Connect Gmail";
+                }
+            } catch (e) {
+                status.innerText = "Connection failed. Is the server running?";
+                btn.disabled = false;
+                btn.innerText = "Connect Gmail";
+            }
+        });
+    </script>
+</body>
+
+</html>

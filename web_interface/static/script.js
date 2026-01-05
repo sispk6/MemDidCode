@@ -1,4 +1,18 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Check Authentication Status
+    try {
+        const authRes = await fetch('/api/auth/status');
+        const authData = await authRes.json();
+
+        // If we are on index.html (root) and NOT authenticated, redirect to setup
+        if (!authData.authenticated && window.location.pathname === '/') {
+            window.location.href = '/static/setup.html';
+            return;
+        }
+    } catch (e) {
+        console.error("Auth check failed", e);
+    }
+
     // Navigation
     const navItems = document.querySelectorAll('.nav-item');
     const tabContents = document.querySelectorAll('.tab-content');

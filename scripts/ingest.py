@@ -21,13 +21,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.ingest.gmail_connector import GmailConnector
 from src.ingest.mcp_gmail_connector import MCPGmailConnector
 from src.utils.state_manager import StateManager
-
-
-def load_config():
-    """Load configuration from config.yaml"""
-    config_path = Path(__file__).parent.parent / "config.yaml"
-    with open(config_path, 'r') as f:
-        return yaml.safe_load(f)
+from src.utils.config_loader import load_config
 
 
 def parse_arguments(default_mode='mcp'):

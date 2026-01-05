@@ -14,12 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.storage.knowledge_base import KnowledgeBase
 from src.utils.state_manager import StateManager
-
-def load_config():
-    """Load configuration from config.yaml"""
-    config_path = Path(__file__).parent.parent / "config.yaml"
-    with open(config_path, 'r') as f:
-        return yaml.safe_load(f)
+from src.utils.config_loader import load_config
 
 def main():
     print("=" * 80)

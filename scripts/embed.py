@@ -19,13 +19,7 @@ from src.preprocessing.cleaner import MessageCleaner
 from src.preprocessing.chunker import TextChunker
 from src.storage.vector_store import VectorStore
 from src.utils.state_manager import StateManager
-
-
-def load_config():
-    """Load configuration from config.yaml"""
-    config_path = Path(__file__).parent.parent / "config.yaml"
-    with open(config_path, 'r') as f:
-        return yaml.safe_load(f)
+from src.utils.config_loader import load_config
 
 
 def get_pending_raw_files(raw_data_path: str, state_mgr: StateManager):
