@@ -90,6 +90,26 @@ def get_rag_brain():
             _rag_brain = None
     return _rag_brain
 
+def _get_all_gmail_configs() -> List[Dict[str, Any]]:
+    """Helper to get all configured Gmail accounts, falling back to legacy 'gmail' block."""
+    accounts = config.get('gmail_accounts')
+    if accounts and isinstance(accounts, list):
+        return accounts
+    if 'gmail' in config:
+        # For legacy compatibility, we treat the single account as 'default'
+        legacy_config = config['gmail'].copy()
+        if 'name' not in legacy_config:
+            legacy_config['name'] = 'default'
+        return [legacy_config]
+    return []
+
+def _get_token_path(account_config: Dict[str, Any]) -> Path:
+    """Resolve token path for a given account config."""
+    token_file = account_config.get('token_file', 'token.json')
+    if not os.path.isabs(token_file):
+        return root_path / token_file
+    return Path(token_file)
+
 # API Endpoints
 @app.get("/")
 async def read_index():
@@ -128,6 +148,7 @@ async def search(query: SearchQuery):
 async def ingest(request: IngestRequest, background_tasks: BackgroundTasks):
     # Run ingestion in the background so the UI doesn't hang
     def run_ingest():
+        # The ingest.py script now handles multiple accounts automatically
         cmd = [
             sys.executable, 
             "scripts/ingest.py", 
@@ -137,7 +158,7 @@ async def ingest(request: IngestRequest, background_tasks: BackgroundTasks):
         subprocess.run(cmd, cwd=str(root_path))
 
     background_tasks.add_task(run_ingest)
-    return {"status": "Ingestion started in background"}
+    return {"status": "Ingestion started in background for all accounts"}
 
 @app.post("/api/embed")
 async def embed(background_tasks: BackgroundTasks):
@@ -169,51 +190,82 @@ async def get_stats():
 # Auth Endpoints
 @app.get("/api/auth/status")
 async def get_auth_status():
-    """Check if the user is authenticated (token.json exists)"""
-    gmail_config = config.get('gmail', {})
-    token_file = gmail_config.get('token_file', 'token.json')
+    """Check authentication status for all configured/legacy accounts."""
+    account_configs = _get_all_gmail_configs()
     
-    # Resolve against project root if relative
-    if not os.path.isabs(token_file):
-        token_file = root_path / token_file
-    else:
-        token_file = Path(token_file)
+    statuses = []
+    for acc in account_configs:
+        token_path = _get_token_path(acc)
+        statuses.append({
+            "name": acc.get('name', 'default'),
+            "authenticated": token_path.exists()
+        })
         
-    is_authenticated = token_file.exists()
-    return {"authenticated": is_authenticated}
+    return {"accounts": statuses}
 
 @app.post("/api/auth/login")
-async def login():
-    """Trigger Gmail authentication flow (opens browser on server)"""
+async def login(account_name: Optional[str] = None):
+    """Trigger Gmail authentication flow for a specific account (opens browser on server)."""
     try:
-        gmail_config = config.get('gmail', {})
-        connector = GmailConnector(gmail_config)
+        account_configs = _get_all_gmail_configs()
         
-        # This will open the browser locally
+        # Find the specific account config
+        target_config = None
+        if account_name:
+            for acc in account_configs:
+                if acc.get('name') == account_name:
+                    target_config = acc
+                    break
+            if not target_config:
+                raise HTTPException(status_code=404, detail=f"Account '{account_name}' not found in config")
+        else:
+            # Default to the first account if none specified
+            if account_configs:
+                target_config = account_configs[0]
+            else:
+                raise HTTPException(status_code=404, detail="No Gmail accounts configured")
+        
+        from src.ingest.gmail_connector import GmailConnector
+        connector = GmailConnector(target_config)
+        
+        # This will open the browser locally (on the system running the API)
         success = connector.authenticate()
         
         if success:
-            return {"status": "success", "message": "Authentication successful"}
+            return {"status": "success", "message": f"Authentication successful for {target_config.get('name', 'default')}"}
         else:
             raise HTTPException(status_code=401, detail="Authentication failed")
             
     except Exception as e:
+        if isinstance(e, HTTPException): raise e
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/auth/logout")
-async def logout():
-    """Log out by deleting the token file"""
-    gmail_config = config.get('gmail', {})
-    token_file = gmail_config.get('token_file', 'token.json')
+async def logout(account_name: Optional[str] = None):
+    """Log out a specific account by deleting its token file."""
+    account_configs = _get_all_gmail_configs()
     
-    if not os.path.isabs(token_file):
-        token_file = root_path / token_file
+    # If no account specified, log out ALL accounts
+    targets = []
+    if account_name:
+        for acc in account_configs:
+            if acc.get('name') == account_name:
+                targets.append(acc)
+                break
+        if not targets:
+            raise HTTPException(status_code=404, detail=f"Account '{account_name}' not found")
     else:
-        token_file = Path(token_file)
-        
-    if token_file.exists():
-        os.remove(token_file)
-        return {"status": "success", "message": "Logged out"}
-    else:
-        return {"status": "success", "message": "Already logged out"}
+        targets = account_configs
+
+    logged_out_names = []
+    for acc in targets:
+        token_path = _get_token_path(acc)
+        if token_path.exists():
+            os.remove(token_path)
+            logged_out_names.append(acc.get('name', 'default'))
+            
+    return {
+        "status": "success", 
+        "message": f"Logged out accounts: {', '.join(logged_out_names) if logged_out_names else 'none'}"
+    }
 

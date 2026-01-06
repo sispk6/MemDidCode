@@ -118,6 +118,7 @@ class VectorStore:
                 metadata = {
                     # Identity & Platform
                     "platform": msg.get('platform', ''),
+                    "account": msg.get('account', 'default'),
                     "type": msg.get('type', ''),
                     
                     # People (Enhanced)

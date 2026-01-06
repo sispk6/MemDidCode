@@ -47,6 +47,100 @@ def parse_arguments(default_mode='mcp'):
     return parser.parse_args()
 
 
+def process_account(account_config, paths_config, args, state_mgr, mode):
+    """Process a single account ingestion."""
+    account_name = account_config.get('name', 'default')
+    print("-" * 40)
+    print(f"Processing Account: {account_name}")
+    print("-" * 40)
+    
+    # Initialize connector based on mode
+    if mode == 'mcp':
+        print(f"[MCP] Using MCP connector for {account_name}")
+        connector = MCPGmailConnector(account_config)
+        use_mcp = True
+    else:
+        print(f"[LEGACY] Using legacy connector for {account_name}")
+        connector = GmailConnector(account_config)
+        use_mcp = False
+    
+    # Platform name for state tracking includes account name if not default
+    platform = connector.platform_name
+    state_platform = f"{platform}:{account_name}" if account_name != "default" else platform
+    
+    # Get last state if not doing a full ingest
+    since_date = None
+    since_id = None
+    if not args.full:
+        state = state_mgr.get_state("ingestion", state_platform, {})
+        since_date = state.get("last_date")
+        since_id = state.get("last_id")
+        if since_date:
+            print(f"[INFO] Performing incremental ingest since {since_date}")
+    else:
+        print("[INFO] Performing FULL ingest (ignoring state)")
+
+    # Authenticate
+    print(f"Step 1: Authenticating {account_name}...")
+    if use_mcp:
+        if not connector.authenticate_sync():
+            print(f"❌ Authentication failed for {account_name}. Skipping.")
+            return
+    else:
+        if not connector.authenticate():
+            print(f"❌ Authentication failed for {account_name}. Skipping.")
+            return
+    
+    print()
+    
+    # Fetch messages
+    max_results = args.max_results if args.max_results else account_config.get('max_results', 100)
+    print(f"Step 2: Fetching up to {max_results} messages for {account_name}...")
+    if use_mcp:
+        messages = connector.fetch_messages_sync(
+            max_results=max_results, 
+            since_date=since_date, 
+            since_id=since_id
+        )
+    else:
+        messages = connector.fetch_messages(
+            max_results=max_results,
+            since_date=since_date,
+            since_id=since_id
+        )
+    
+    if not messages:
+        print(f"No new messages fetched for {account_name}.")
+        return
+    
+    # Add account tag to each message for storage
+    for msg in messages:
+        msg['account'] = account_name
+    
+    print()
+    
+    # Save raw data
+    print(f"Step 3: Saving raw data for {account_name}...")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    mode_suffix = "_mcp" if use_mcp else ""
+    acc_suffix = f"_{account_name}" if account_name != "default" else ""
+    output_path = Path(paths_config['raw_data']) / f"gmail{mode_suffix}{acc_suffix}_{timestamp}.json"
+    
+    connector.save_raw_data(messages, str(output_path))
+    
+    # Update state with the newest message from this batch
+    newest_msg = messages[-1]
+    state_mgr.update_state("ingestion", state_platform, {
+        "last_date": newest_msg['date'],
+        "last_id": newest_msg['id']
+    })
+    
+    print(f"[OK] {account_name} Ingestion complete!")
+    print(f"   Messages fetched: {len(messages)}")
+    print(f"   Saved to: {output_path}")
+    print()
+
+
 def main():
     # Load config first to get defaults
     config = load_config()
@@ -64,96 +158,25 @@ def main():
     # Initialize StateManager
     state_mgr = StateManager()
     
-    # Use loaded config
-    gmail_config = config['gmail']
     paths_config = config['paths']
     
-    # Override max_results if provided
-    max_results = args.max_results if args.max_results else gmail_config.get('max_results', 100)
-    
-    # Initialize connector based on mode
-    if args.mode == 'mcp':
-        print("[MCP] Using MCP connector")
-        connector = MCPGmailConnector(gmail_config)
-        use_mcp = True
+    # Detect multiple accounts
+    accounts = config.get('gmail_accounts')
+    if accounts and isinstance(accounts, list):
+        print(f"[INFO] Found {len(accounts)} configured Gmail accounts.")
+        for account in accounts:
+            process_account(account, paths_config, args, state_mgr, args.mode)
     else:
-        print("[LEGACY] Using legacy connector")
-        connector = GmailConnector(gmail_config)
-        use_mcp = False
-    
-    platform = connector.platform_name
-    
-    # Get last state if not doing a full ingest
-    since_date = None
-    since_id = None
-    if not args.full:
-        state = state_mgr.get_state("ingestion", platform, {})
-        since_date = state.get("last_date")
-        since_id = state.get("last_id")
-        if since_date:
-            print(f"[INFO] Performing incremental ingest since {since_date}")
-    else:
-        print("[INFO] Performing FULL ingest (ignoring state)")
+        # Fall back to single account
+        if 'gmail' in config:
+            print("[INFO] Using single Gmail account configuration.")
+            process_account(config['gmail'], paths_config, args, state_mgr, args.mode)
+        else:
+            print("[ERROR] No Gmail configuration found!")
+            return
 
-    # Authenticate
-    print("Step 1: Authenticating with Gmail...")
-    if use_mcp:
-        # MCP connector has sync wrapper for backward compatibility
-        if not connector.authenticate_sync():
-            print("❌ Authentication failed. Exiting.")
-            return
-    else:
-        if not connector.authenticate():
-            print("❌ Authentication failed. Exiting.")
-            return
-    
-    print()
-    
-    # Fetch messages
-    print(f"Step 2: Fetching up to {max_results} messages...")
-    if use_mcp:
-        # MCP connector has sync wrapper for backward compatibility
-        messages = connector.fetch_messages_sync(
-            max_results=max_results, 
-            since_date=since_date, 
-            since_id=since_id
-        )
-    else:
-        messages = connector.fetch_messages(
-            max_results=max_results,
-            since_date=since_date,
-            since_id=since_id
-        )
-    
-    if not messages:
-        print("No new messages fetched.")
-        return
-    
-    print()
-    
-    # Save raw data
-    print("Step 3: Saving raw data...")
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    mode_suffix = "_mcp" if use_mcp else ""
-    output_path = Path(paths_config['raw_data']) / f"gmail{mode_suffix}_{timestamp}.json"
-    
-    connector.save_raw_data(messages, str(output_path))
-    
-    # Update state with the newest message from this batch
-    # Since we sorted them ascending in the connector, the last one is the newest
-    newest_msg = messages[-1]
-    state_mgr.update_state("ingestion", platform, {
-        "last_date": newest_msg['date'],
-        "last_id": newest_msg['id']
-    })
-    
-    print()
     print("=" * 80)
-    print("[OK] Ingestion complete!")
-    print(f"   Mode: {args.mode.upper()}")
-    print(f"   Messages fetched: {len(messages)}")
-    print(f"   Saved to: {output_path}")
-    print(f"   Updated state: {newest_msg['date']}")
+    print("[OK] All ingestions complete!")
     print("=" * 80)
     print()
     print("Next step: Run 'python scripts/embed.py' to generate embeddings")

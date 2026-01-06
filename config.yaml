@@ -4,6 +4,15 @@ gmail:
   token_file: "token.json"
   max_results: 100
 
+# Optional: Multiple Gmail accounts support
+# gmail_accounts:
+#   - name: "Personal"
+#     token_file: "token_personal.json"
+#     max_results: 100
+#   - name: "Work"
+#     token_file: "token_work.json"
+#     max_results: 50
+
 embeddings:
   model_name: "sentence-transformers/all-MiniLM-L6-v2"
   dimension: 384
