@@ -1,6 +1,13 @@
 # Did-I - Personal Memory Assistant
 
-Your personal AI-powered memory that remembers everything across Gmail (and soon Slack, Calendar, etc.)
+Your personal AI-powered memory that remembers everything across Gmail messages and attachments (pdf/docs initially), (and soon Slack, Calendar, etc.)
+   - Show AI answers and referenced source results
+   - local data storage
+   - searches mails and attachments semantically
+   - stores metadata for filter based search
+   - Keeps identities across Apps
+   - loads missing/new data incrementally
+   - Knowledge Graph
 
 ## 🎯 What It Does
 
@@ -240,7 +247,6 @@ paths:
 - [ ] Add Slack integration
 - [ ] Add date/decision extraction
 - [ ] Build browser extension UI
-- [ ] Add incremental updates
 - [ ] Multi-user support
 
 ---
