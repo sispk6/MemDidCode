@@ -31,6 +31,7 @@ storage:
 
 paths:
   raw_data: "./data/raw"
+  users_base_dir: "./data/users"
 
 chunking:
   chunk_size: 2000

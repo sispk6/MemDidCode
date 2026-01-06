@@ -49,7 +49,7 @@ def get_pending_raw_files(raw_data_path: str, state_mgr: StateManager):
     return pending_files
 
 
-def process_file(file_path: Path, embedder: Embedder, vector_store: VectorStore, chunker: TextChunker, sub_batch_size: int = 100):
+def process_file(file_path: Path, embedder: Embedder, vector_store: VectorStore, chunker: TextChunker, user_id: str, sub_batch_size: int = 100):
     """Process a single raw data file in smaller batches to save memory"""
     import gc
     print(f"[INFO] Processing: {file_path.name}")
@@ -82,8 +82,8 @@ def process_file(file_path: Path, embedder: Embedder, vector_store: VectorStore,
         # Generate embeddings for this sub-batch
         sub_batch = embedder.embed_messages(sub_batch, text_key='embedding_text')
         
-        # Store this sub-batch immediately
-        if not vector_store.add_messages(sub_batch):
+        # Store this sub-batch immediately with user_id
+        if not vector_store.add_messages(sub_batch, user_id=user_id):
             print(f"  [ERROR] Failed to add sub-batch {i//sub_batch_size + 1}")
             success = False
             break
@@ -110,6 +110,7 @@ def main():
     parser = argparse.ArgumentParser(description="Generate embeddings and store in ChromaDB")
     parser.add_argument("--full", action="store_true", help="Force re-embedding of all files")
     parser.add_argument("--batch-size", type=int, default=50, help="Sub-batch size for memory safety (default: 50)")
+    parser.add_argument("--user-id", type=str, default=None, help="User ID for multi-tenant embedding")
     args = parser.parse_args()
 
     print("=" * 80)
@@ -124,9 +125,20 @@ def main():
     storage_config = config['storage']
     paths_config = config['paths']
     
-    # Initialize StateManager with auto_save=False for performance
-    # We will save manually after each batch or at the end
-    state_mgr = StateManager(auto_save=False)
+    # Determine user-specific paths
+    user_id = args.user_id
+    paths_config = config['paths']
+    
+    state_file = "data/system_state.json" 
+    if user_id:
+        user_dir = Path(paths_config['users_base_dir']) / user_id
+        state_file = user_dir / "system_state.json"
+        print(f"[INFO] Using isolated workspace for User: {user_id}")
+    else:
+        print("[INFO] No User ID provided. Using global system workspace.")
+
+    # Initialize StateManager with user-specific state and auto_save=False for performance
+    state_mgr = StateManager(state_file=str(state_file), auto_save=False)
     
     # Force reload of preprocessing modules to get latest code
     import sys
@@ -155,10 +167,13 @@ def main():
     )
     print()
     
-    # Find pending files
+    # Find pending files for the user
     raw_path = paths_config['raw_data']
+    if user_id:
+        raw_path = Path(paths_config['users_base_dir']) / user_id / "raw"
+    
     if args.full:
-        print("[INFO] Full mode: scanning all files regardless of state")
+        print(f"[INFO] Full mode: scanning all files in {raw_path}")
         pending_files = sorted(list(Path(raw_path).glob("gmail_*.json")), key=lambda p: p.stat().st_mtime)
     else:
         pending_files = get_pending_raw_files(raw_path, state_mgr)
@@ -172,7 +187,7 @@ def main():
     
     processed_count = 0
     for f in pending_files:
-        success = process_file(f, embedder, vector_store, chunker, sub_batch_size=args.batch_size)
+        success = process_file(f, embedder, vector_store, chunker, user_id=user_id or "system", sub_batch_size=args.batch_size)
         if success:
             state_mgr.add_to_list("embedding", "gmail", f.name)
             processed_count += 1

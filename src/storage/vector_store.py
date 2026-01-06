@@ -42,12 +42,13 @@ class VectorStore:
         print(f"[OK] ChromaDB initialized. Collection: {collection_name}")
         print(f"   Current document count: {self.collection.count()}")
     
-    def add_messages(self, messages: List[Dict[str, Any]]) -> bool:
+    def add_messages(self, messages: List[Dict[str, Any]], user_id: str) -> bool:
         """
         Add messages with embeddings to the vector store.
         
         Args:
             messages: List of message dictionaries with 'embedding' field
+            user_id: ID of the user who owns these messages
             
         Returns:
             bool: True if successful
@@ -117,6 +118,7 @@ class VectorStore:
                 
                 metadata = {
                     # Identity & Platform
+                    "user_id": user_id,
                     "platform": msg.get('platform', ''),
                     "account": msg.get('account', 'default'),
                     "type": msg.get('type', ''),
@@ -172,6 +174,7 @@ class VectorStore:
             return False
     
     def search(self, query_embedding: List[float], 
+               user_id: str,
                n_results: int = 10,
                where: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         """
@@ -179,17 +182,26 @@ class VectorStore:
         
         Args:
             query_embedding: Embedding vector for the query
+            user_id: ID of the user performing the search
             n_results: Number of results to return
-            where: Optional metadata filters (e.g., {"platform": "gmail"})
+            where: Optional additional metadata filters
             
         Returns:
             List of matching messages with metadata
         """
+        # Enforce multi-tenancy filter
+        user_where = {"user_id": user_id}
+        if where:
+            # Combine filters using $and if where is not empty
+            combined_where = {"$and": [user_where, where]}
+        else:
+            combined_where = user_where
+
         try:
             results = self.collection.query(
                 query_embeddings=[query_embedding],
                 n_results=n_results,
-                where=where,
+                where=combined_where,
                 include=['documents', 'metadatas', 'distances']
             )
             

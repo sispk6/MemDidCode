@@ -22,10 +22,35 @@ class KnowledgeBase:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             
+            # Users Table (System Level)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS users (
+                    id TEXT PRIMARY KEY,
+                    username TEXT NOT NULL UNIQUE,
+                    display_name TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+
+            # Accounts Table (Gmail, Slack configs linked to users)
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS accounts (
+                    id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    platform TEXT NOT NULL, -- 'gmail', 'slack'
+                    account_name TEXT NOT NULL, -- e.g. 'Personal'
+                    config_json TEXT, -- JSON blob for token_file, credentials_file
+                    is_active BOOLEAN DEFAULT 1,
+                    FOREIGN KEY (user_id) REFERENCES users (id),
+                    UNIQUE(user_id, platform, account_name)
+                )
+            ''')
+
             # Entities Table (People, Organizations, Groups)
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS entities (
                     id TEXT PRIMARY KEY,
+                    user_id TEXT, -- Optional: owner of this entity record
                     type TEXT NOT NULL, -- 'person', 'organization', 'group'
                     canonical_name TEXT NOT NULL,
                     metadata TEXT, -- JSON blob for role, department, etc.
@@ -126,15 +151,63 @@ class KnowledgeBase:
             )
             conn.commit()
 
-    def get_all_entities(self, entity_type: str = None) -> List[Dict]:
-        """List all entities, optionally filtered by type."""
+    def get_all_entities(self, user_id: str, entity_type: str = None) -> List[Dict]:
+        """List all entities for a specific user, optionally filtered by type."""
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
-            query = "SELECT * FROM entities"
-            params = ()
+            query = "SELECT * FROM entities WHERE user_id = ?"
+            params = [user_id]
+            
             if entity_type:
-                query += " WHERE type = ?"
-                params = (entity_type,)
+                query += " AND type = ?"
+                params.append(entity_type)
+            
+            cursor = conn.execute(query, params)
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+
+    # --- Multi-Tenancy Management ---
+
+    def register_user(self, username: str, display_name: str = None) -> str:
+        """Register a new system user."""
+        user_id = str(uuid.uuid4())
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                "INSERT INTO users (id, username, display_name) VALUES (?, ?, ?)",
+                (user_id, username, display_name or username)
+            )
+            conn.commit()
+        return user_id
+
+    def get_user_by_username(self, username: str) -> Optional[Dict]:
+        """Fetch user by username."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute("SELECT * FROM users WHERE username = ?", (username,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    def add_account(self, user_id: str, platform: str, account_name: str, config: Dict = None) -> str:
+        """Add a service account (Gmail/Slack) for a user."""
+        account_id = str(uuid.uuid4())
+        config_json = json.dumps(config or {})
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                "INSERT INTO accounts (id, user_id, platform, account_name, config_json) VALUES (?, ?, ?, ?, ?)",
+                (account_id, user_id, platform, account_name, config_json)
+            )
+            conn.commit()
+        return account_id
+
+    def get_user_accounts(self, user_id: str, platform: str = None) -> List[Dict]:
+        """List all accounts for a user."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            query = "SELECT * FROM accounts WHERE user_id = ?"
+            params = [user_id]
+            if platform:
+                query += " AND platform = ?"
+                params.append(platform)
             
             cursor = conn.execute(query, params)
             rows = cursor.fetchall()

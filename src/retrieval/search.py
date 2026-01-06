@@ -20,7 +20,7 @@ class SearchEngine:
         self.vector_store = vector_store
         self.embedder = embedder
     
-    def search(self, query_text: str, n_results: int = 10, 
+    def search(self, query_text: str, user_id: str, n_results: int = 10, 
                platform: Optional[str] = None,
                sender: Optional[str] = None,
                entity_id: Optional[str] = None,
@@ -56,6 +56,7 @@ class SearchEngine:
         # Search in vector store
         results = self.vector_store.search(
             query_embedding=query_embedding.tolist(),
+            user_id=user_id,
             n_results=n_results,
             where=where_clause
         )
