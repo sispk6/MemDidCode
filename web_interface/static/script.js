@@ -1,16 +1,34 @@
 document.addEventListener('DOMContentLoaded', async () => {
     // Check Authentication Status
     try {
-        const authRes = await fetch('/api/auth/status');
-        const authData = await authRes.json();
+        const authRes = await fetch('/api/auth/current-user', { credentials: 'include' });
 
-        // If we are on index.html (root) and NOT authenticated, redirect to setup
-        if (!authData.authenticated && window.location.pathname === '/') {
-            window.location.href = '/static/setup.html';
+        // If not authenticated, redirect to login page
+        if (!authRes.ok && window.location.pathname === '/') {
+            window.location.href = '/static/login.html';
             return;
+        }
+
+        // Display user info if authenticated
+        if (authRes.ok) {
+            const authData = await authRes.json();
+            if (authData.user) {
+                document.getElementById('user-display').innerText = authData.user.display_name || authData.user.username;
+                document.getElementById('user-id').innerText = authData.user.id;
+            }
+
+            // If user has no accounts, redirect to setup
+            if (authData.has_accounts === false && window.location.pathname === '/') {
+                window.location.href = '/static/setup.html';
+                return;
+            }
         }
     } catch (e) {
         console.error("Auth check failed", e);
+        if (window.location.pathname === '/') {
+            window.location.href = '/static/login.html';
+            return;
+        }
     }
 
     // Navigation
@@ -56,6 +74,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const response = await fetch('/api/search', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
                 body: JSON.stringify({ text, platform, entity_id })
             });
             const data = await response.json();
@@ -114,6 +133,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const response = await fetch('/api/ingest', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
                 body: JSON.stringify({ mode, max_results: 50 })
             });
             const data = await response.json();
@@ -126,7 +146,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     embedBtn.addEventListener('click', async () => {
         addLog(`[System] Requesting embedding generation...`);
         try {
-            const response = await fetch('/api/embed', { method: 'POST' });
+            const response = await fetch('/api/embed', {
+                method: 'POST',
+                credentials: 'include'
+            });
             const data = await response.json();
             addLog(`[OK] ${data.status}`);
         } catch (error) {
@@ -142,7 +165,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     async function loadStats() {
         try {
-            const response = await fetch('/api/stats');
+            const response = await fetch('/api/stats', { credentials: 'include' });
             const data = await response.json();
             document.getElementById('doc-count').innerText = data.total_messages;
             document.getElementById('platform-name').innerText = "Hybrid";
@@ -153,7 +176,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     async function loadEntities() {
         try {
-            const response = await fetch('/api/kb/entities');
+            const response = await fetch('/api/kb/entities', { credentials: 'include' });
             const data = await response.json();
             const filter = document.getElementById('entity-filter');
             const list = document.getElementById('kb-entities-list');

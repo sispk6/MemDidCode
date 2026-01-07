@@ -2,6 +2,7 @@ import sqlite3
 import json
 import uuid
 import os
+import hashlib
 from typing import Dict, List, Optional, Any, Union
 from pathlib import Path
 
@@ -28,6 +29,7 @@ class KnowledgeBase:
                     id TEXT PRIMARY KEY,
                     username TEXT NOT NULL UNIQUE,
                     display_name TEXT,
+                    password_hash TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
@@ -168,13 +170,15 @@ class KnowledgeBase:
 
     # --- Multi-Tenancy Management ---
 
-    def register_user(self, username: str, display_name: str = None) -> str:
-        """Register a new system user."""
+    def register_user(self, username: str, password: str, display_name: str = None) -> str:
+        """Register a new system user with password."""
         user_id = str(uuid.uuid4())
+        password_hash = hashlib.sha256(password.encode()).hexdigest()
+        
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
-                "INSERT INTO users (id, username, display_name) VALUES (?, ?, ?)",
-                (user_id, username, display_name or username)
+                "INSERT INTO users (id, username, display_name, password_hash) VALUES (?, ?, ?, ?)",
+                (user_id, username, display_name or username, password_hash)
             )
             conn.commit()
         return user_id
@@ -184,6 +188,27 @@ class KnowledgeBase:
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.execute("SELECT * FROM users WHERE username = ?", (username,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    def get_user_by_id(self, user_id: str) -> Optional[Dict]:
+        """Fetch user by ID."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    def verify_user_credentials(self, username: str, password: str) -> Optional[Dict]:
+        """Verify username/password and return user if valid."""
+        password_hash = hashlib.sha256(password.encode()).hexdigest()
+        
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute(
+                "SELECT * FROM users WHERE username = ? AND password_hash = ?",
+                (username, password_hash)
+            )
             row = cursor.fetchone()
             return dict(row) if row else None
 

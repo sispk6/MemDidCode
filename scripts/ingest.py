@@ -47,6 +47,11 @@ def parse_arguments(default_mode='mcp'):
         default=None,
         help='User ID for multi-tenant ingestion'
     )
+    parser.add_argument(
+        '--full',
+        action='store_true',
+        help='Perform a full ingest (ignoring last state)'
+    )
     return parser.parse_args()
 
 

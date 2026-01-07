@@ -40,6 +40,7 @@ chromadb/
 Thumbs.dbmemoenv/
 credentials.json
 token.json
+token_default.json
 .env*
 *.key
 *.pem

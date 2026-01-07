@@ -269,6 +269,24 @@ class VectorStore:
         except Exception as e:
             print(f"[ERROR] Error deleting messages: {e}")
             return False
+
+    def delete_user_data(self, user_id: str) -> bool:
+        """
+        Delete all messages belonging to a specific user.
+        
+        Args:
+            user_id: ID of the user whose data should be deleted
+            
+        Returns:
+            bool: True if successful
+        """
+        try:
+            self.collection.delete(where={"user_id": user_id})
+            print(f"[OK] Deleted all ChromaDB data for user: {user_id}")
+            return True
+        except Exception as e:
+            print(f"[ERROR] Error deleting user data: {e}")
+            return False
     
     def clear_collection(self) -> bool:
         """Delete all messages from the collection"""
@@ -284,7 +302,7 @@ class VectorStore:
             print(f"[ERROR] Error clearing collection: {e}")
             return False
     
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self, user_id: str = None) -> Dict[str, Any]:
         """Get collection statistics"""
         count = self.collection.count()
         return {

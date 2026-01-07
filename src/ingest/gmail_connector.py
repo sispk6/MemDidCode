@@ -5,6 +5,8 @@ Path: src/ingest/gmail_connector.py
 import os
 import base64
 from typing import List, Dict, Any
+import pathlib
+from pathlib import Path
 from datetime import datetime
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -13,6 +15,7 @@ from googleapiclient.discovery import build
 from google.auth.exceptions import RefreshError
 import pickle
 import io
+import zipfile
 from pypdf import PdfReader
 import docx
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type, before_sleep_log
@@ -261,10 +264,22 @@ class GmailConnector(BaseConnector):
                 print(f"  [WARN] Skipping {filename} - too large ({size / 1024 / 1024:.1f} MB)")
                 return
 
-            # 2. Skip unsupported compressed or binary formats
-            unsupported_exts = ['.rar', '.zip', '.7z', '.exe', '.dll', '.bin', '.iso', '.dmg']
+            # 2. Skip unsupported binary formats (but allow zip/rar for digging)
+            unsupported_exts = ['.exe', '.dll', '.bin', '.iso', '.dmg']
             if any(filename.lower().endswith(ext) for ext in unsupported_exts):
-                print(f"  [INFO] Skipping {filename} - unsupported format")
+                print(f"  [INFO] Skipping {filename} - unsupported binary format")
+                return
+
+            ext = pathlib.Path(filename).suffix.lower()
+            
+            # 3. Handle Archives (Dive inside)
+            if ext == '.zip':
+                print(f"  [INFO] Diving into ZIP: {filename}")
+                self._process_zip(base64.urlsafe_b64decode(attachment_data['data']), filename, attachments)
+                return
+            
+            if ext == '.rar':
+                print(f"  [INFO] .rar support requires 'rarfile' library. Skipping {filename} for now.")
                 return
 
             print(f"  [INFO] Processing attachment: {filename} ({mime_type}, {size} bytes)")
@@ -281,7 +296,7 @@ class GmailConnector(BaseConnector):
                 
                 # Parse content based on file extension or mime type
                 content = ""
-                ext = Path(filename).suffix.lower()
+                ext = pathlib.Path(filename).suffix.lower()
                 
                 if ext == '.pdf':
                     content = self._parse_pdf(raw_content)
@@ -307,6 +322,42 @@ class GmailConnector(BaseConnector):
         if 'parts' in part:
             for subpart in part['parts']:
                 self._find_attachments(subpart, msg_id, attachments)
+
+    def _process_zip(self, zip_bytes: bytes, zip_filename: str, attachments: List[Dict[str, Any]]):
+        """Extract indexable content from inside a ZIP file"""
+        try:
+            with zipfile.ZipFile(io.BytesIO(zip_bytes)) as z:
+                for file_info in z.infolist():
+                    if file_info.is_dir():
+                        continue
+                    
+                    filename = file_info.filename
+                    ext = pathlib.Path(filename).suffix.lower()
+                    
+                    # Read inner file content
+                    try:
+                        with z.open(file_info) as f:
+                            inner_content_bytes = f.read()
+                        
+                        content = ""
+                        if ext == '.pdf':
+                            content = self._parse_pdf(inner_content_bytes)
+                        elif ext in ['.docx', '.doc']:
+                            content = self._parse_docx(inner_content_bytes)
+                        elif ext in ['.txt', '.md', '.csv']:
+                            content = inner_content_bytes.decode('utf-8', errors='ignore')
+                        
+                        if content:
+                            attachments.append({
+                                "filename": f"{zip_filename}/{filename}",
+                                "mime_type": "application/octet-stream", # Inner mime type is harder to detect
+                                "content": content
+                            })
+                            print(f"    [OK] Extracted {len(content)} chars from inside ZIP: {filename}")
+                    except Exception as e:
+                        print(f"    [WARN] Failed to process inner file {filename} in {zip_filename}: {e}")
+        except Exception as e:
+            print(f"  [ERROR] Failed to open ZIP archive {zip_filename}: {e}")
 
     def _parse_pdf(self, content_bytes: bytes) -> str:
         """Extract text from PDF bytes"""

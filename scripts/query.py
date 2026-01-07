@@ -20,20 +20,18 @@ from src.utils.config_loader import load_config
 
 
 def main():
-    # Check if query provided
-    if len(sys.argv) < 2:
-        print("Usage: python scripts/query.py \"your search query\"")
-        print()
-        print("Examples:")
-        print('  python scripts/query.py "When did I agree to send the report?"')
-        print('  python scripts/query.py "What did Alice say about the budget?"')
-        sys.exit(1)
+    import argparse
+    parser = argparse.ArgumentParser(description="Query your personal memory")
+    parser.add_argument("query", type=str, nargs="+", help="The search query")
+    parser.add_argument("--user-id", type=str, required=True, help="User ID for multi-tenant search")
+    parser.add_argument("--results", type=int, default=3, help="Number of results to return (default: 3)")
     
-    # Get query from command line
-    query = " ".join(sys.argv[1:])
+    args = parser.parse_args()
+    query_text = " ".join(args.query)
+    user_id = args.user_id
     
     print("=" * 80)
-    print("Did-I - Personal Memory Search")
+    print(f"Did-I - Personal Memory Search (User: {user_id})")
     print("=" * 80)
     print()
     
@@ -57,7 +55,7 @@ def main():
     print()
     
     # Perform search
-    results = search_engine.search(query, n_results=3)
+    results = search_engine.search(query_text, user_id=user_id, n_results=args.results)
     
     # Display results
     print(search_engine.format_results_for_display(results))

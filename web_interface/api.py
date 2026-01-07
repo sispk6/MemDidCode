@@ -2,10 +2,11 @@ import os
 import sys
 import subprocess
 from typing import List, Dict, Any, Optional
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Header, Depends
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Request, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
+from starlette.middleware.sessions import SessionMiddleware
 import yaml
 from pathlib import Path
 import json
@@ -28,15 +29,26 @@ from src.utils.config_loader import load_config
 
 app = FastAPI(title="Did-I Personal Memory Assistant")
 
+# Add session middleware with a secret key
+SECRET_KEY = os.getenv("SESSION_SECRET_KEY", "your-secret-key-change-in-production")
+app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
+
 # Mount static files
 static_dir = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 # --- Dependencies & Helpers ---
 
-async def get_user_id(x_user_id: Optional[str] = Header(None)):
-    """Extract user ID from header. Defaults to 'system' for legacy/local mode."""
-    return x_user_id or "system"
+async def get_user_id(request: Request) -> str:
+    """Extract user ID from session. Raises HTTPException if not logged in."""
+    user_id = request.session.get('user_id')
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return user_id
+
+async def get_user_id_optional(request: Request) -> str:
+    """Extract user ID from session. Returns 'system' for legacy/local mode."""
+    return request.session.get('user_id', 'system')
 
 def get_user_workspace(user_id: str) -> Path:
     """Ensure user workspace exists and return path."""
@@ -56,6 +68,15 @@ class SearchQuery(BaseModel):
 class IngestRequest(BaseModel):
     mode: str = "legacy"
     max_results: int = 10
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+class RegisterRequest(BaseModel):
+    username: str
+    password: str
+    display_name: Optional[str] = None
 
 # Initialization
 config = load_config()
@@ -180,7 +201,7 @@ async def search(query: SearchQuery, user_id: str = Depends(get_user_id)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/search_simple")
-async def search_simple(q: str, user_id: str = Header(..., alias="X-User-ID")):
+async def search_simple(q: str, user_id: str = Depends(get_user_id)):
     """Semantic search for messages belonging to a specific user"""
     try:
         embedder = get_embedder()
@@ -200,6 +221,95 @@ async def search_simple(q: str, user_id: str = Header(..., alias="X-User-ID")):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# Auth Endpoints
+@app.post("/api/auth/register")
+async def register(request: Request, body: RegisterRequest):
+    """Register a new user."""
+    try:
+        kb = get_kb()
+        
+        # Check if username already exists
+        existing_user = kb.get_user_by_username(body.username)
+        if existing_user:
+            raise HTTPException(status_code=400, detail="Username already exists")
+        
+        # Register new user
+        user_id = kb.register_user(
+            username=body.username,
+            password=body.password,
+            display_name=body.display_name
+        )
+        
+        # Set session
+        request.session['user_id'] = user_id
+        request.session['username'] = body.username
+        
+        return {"status": "success", "user_id": user_id, "username": body.username}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/auth/login")
+async def login_user(request: Request, body: LoginRequest):
+    """Login with username/password."""
+    try:
+        kb = get_kb()
+        
+        # Verify credentials
+        user = kb.verify_user_credentials(body.username, body.password)
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid username or password")
+        
+        # Set session
+        request.session['user_id'] = user['id']
+        request.session['username'] = user['username']
+        
+        return {
+            "status": "success",
+            "user": {
+                "id": user['id'],
+                "username": user['username'],
+                "display_name": user['display_name']
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/auth/logout")
+async def logout_user(request: Request):
+    """Logout current user."""
+    request.session.clear()
+    return {"status": "success", "message": "Logged out successfully"}
+
+@app.get("/api/auth/current-user")
+async def get_current_user(request: Request):
+    """Get currently logged-in user."""
+    user_id = request.session.get('user_id')
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    kb = get_kb()
+    user = kb.get_user_by_id(user_id)
+    if not user:
+        request.session.clear()
+        raise HTTPException(status_code=401, detail="User not found")
+    
+    # Check if user has any accounts
+    accounts = kb.get_user_accounts(user_id)
+    
+    return {
+        "authenticated": True,
+        "user": {
+            "id": user['id'],
+            "username": user['username'],
+            "display_name": user['display_name']
+        },
+        "has_accounts": len(accounts) > 0
+    }
+
 
 @app.post("/api/ingest")
 async def ingest(request: IngestRequest, background_tasks: BackgroundTasks, user_id: str = Depends(get_user_id)):
@@ -217,6 +327,7 @@ async def ingest(request: IngestRequest, background_tasks: BackgroundTasks, user
 
     background_tasks.add_task(run_ingest)
     return {"status": f"Ingestion started in background for all accounts for user {user_id}"}
+
 
 @app.post("/api/embed")
 async def embed(background_tasks: BackgroundTasks, user_id: str = Depends(get_user_id)):
@@ -259,12 +370,35 @@ async def get_auth_status(user_id: str = Depends(get_user_id)):
             "authenticated": token_path.exists()
         })
         
-    return {"accounts": statuses}
+    return {
+        "authenticated": any(s["authenticated"] for s in statuses),
+        "accounts": statuses
+    }
 
-@app.post("/api/auth/login")
-async def login(account_name: Optional[str] = None, user_id: str = Depends(get_user_id)):
+# Gmail OAuth Endpoints  
+@app.get("/api/gmail/status")
+async def get_gmail_status(user_id: str = Depends(get_user_id)):
+    """Check Gmail authentication status for all configured accounts."""
+    account_configs = _get_all_gmail_configs(user_id)
+    
+    statuses = []
+    for acc in account_configs:
+        token_path = _get_token_path(acc, user_id)
+        statuses.append({
+            "name": acc.get('name', 'default'),
+            "authenticated": token_path.exists()
+        })
+        
+    return {
+        "authenticated": any(s["authenticated"] for s in statuses),
+        "accounts": statuses
+    }
+
+@app.post("/api/gmail/connect")
+async def gmail_connect(account_name: Optional[str] = None, user_id: str = Depends(get_user_id)):
     """Trigger Gmail authentication flow for a specific account (opens browser on server)."""
     try:
+        kb = get_kb()
         account_configs = _get_all_gmail_configs(user_id)
         
         # Find the specific account config
@@ -277,9 +411,17 @@ async def login(account_name: Optional[str] = None, user_id: str = Depends(get_u
             if account_configs:
                 target_config = account_configs[0]
             else:
-                raise HTTPException(status_code=404, detail="No Gmail accounts configured")
+                # Fallback to system config if NO accounts configured for this user yet
+                system_configs = _get_all_gmail_configs("system")
+                if system_configs:
+                    target_config = system_configs[0]
+                    # We'll treat this as a "Personal" account for the new user
+                    target_config = target_config.copy()
+                    target_config['name'] = "Personal"
+                else:
+                    raise HTTPException(status_code=404, detail="No Gmail accounts configured in system")
         
-        # Override token_file to the user-specific one for the actual authentication process
+        # Override token_file to the user-specific one
         token_path = _get_token_path(target_config, user_id)
         target_config = target_config.copy()
         target_config['token_file'] = str(token_path)
@@ -291,17 +433,37 @@ async def login(account_name: Optional[str] = None, user_id: str = Depends(get_u
         success = connector.authenticate()
         
         if success:
-            return {"status": "success", "message": f"Authentication successful for {target_config.get('name', 'default')}"}
+            # If successful, ensure the account is saved in the KB for this user
+            existing_user_accounts = kb.get_user_accounts(user_id, platform="gmail")
+            name = target_config.get('name', 'Personal')
+            
+            if not any(acc['account_name'] == name for acc in existing_user_accounts):
+                # Add account record to DB
+                kb.add_account(
+                    user_id=user_id,
+                    platform="gmail",
+                    account_name=name,
+                    config={
+                        "credentials_file": target_config.get('credentials_file', 'credentials.json'),
+                        "token_file": str(token_path.name), # Just the filename, _get_token_path handles resolution
+                        "max_results": target_config.get('max_results', 100)
+                    }
+                )
+                print(f"[INFO] New Gmail account '{name}' registered in database for user {user_id}")
+            
+            return {"status": "success", "message": f"Authentication successful for {name}"}
         else:
             raise HTTPException(status_code=401, detail="Authentication failed")
             
     except Exception as e:
         if isinstance(e, HTTPException): raise e
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/auth/logout")
-async def logout(account_name: Optional[str] = None, user_id: str = Depends(get_user_id)):
-    """Log out a specific account by deleting its token file."""
+@app.post("/api/gmail/disconnect")
+async def gmail_disconnect(account_name: Optional[str] = None, user_id: str = Depends(get_user_id)):
+    """Disconnect a specific Gmail account by deleting its token file."""
     account_configs = _get_all_gmail_configs(user_id)
     
     # If no account specified, log out ALL accounts

@@ -103,13 +103,17 @@
             status.innerText = "A browser window will open. Please log in.";
 
             try {
-                const res = await fetch('/api/auth/login', { method: 'POST' });
+                // Correct endpoint for connecting Gmail
+                const res = await fetch('/api/gmail/connect', {
+                    method: 'POST',
+                    credentials: 'include'
+                });
                 if (res.ok) {
                     status.innerText = "Success! Redirecting...";
                     setTimeout(() => window.location.href = '/', 1000);
                 } else {
                     const data = await res.json();
-                    status.innerText = "Error: " + data.detail;
+                    status.innerText = "Error: " + (data.detail || "Connection failed");
                     btn.disabled = false;
                     btn.innerText = "Connect Gmail";
                 }
