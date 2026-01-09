@@ -245,3 +245,21 @@ Provide a concise summary highlighting key points, decisions, and action items."
         except Exception as e:
             return f"Error generating summary: {e}"
         return "Provider error"
+
+    def generate_raw(self, prompt: str) -> str:
+        """
+        Generate raw text completion without predefined templates.
+        Used for evaluation and synthetic data generation.
+        """
+        try:
+            if self.provider == 'gemini' and self.model:
+                response = self.model.generate_content(prompt)
+                return response.text.strip()
+            elif self.provider == 'huggingface':
+                # Re-use HF inference logic but with custom prompt
+                result = self._generate_huggingface(prompt, 0)
+                return result.get('answer', '').strip()
+        except Exception as e:
+            print(f"[DEBUG] Raw generation failed: {e}")
+            return ""
+        return ""

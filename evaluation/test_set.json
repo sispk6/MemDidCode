@@ -1,0 +1,52 @@
+[
+  {
+    "query": "What types of data can be best described by the central tendency metrics such as mean, median, and mode?",
+    "expected_id": "gmail_1821eb6c530fec10_att_0_chunk_2",
+    "source_hint": "Document from Imtiaz"
+  },
+  {
+    "query": "What is the best way for me to host a traditional Indian dinner party with minimal effort using a meal delivery service?",
+    "expected_id": "gmail_17b9142fdec6f1d1_chunk_1",
+    "source_hint": "Throw a dawat with Home Chef! \ud83d\udc96\ud83d\udc96"
+  },
+  {
+    "query": "How do I get a $5 discount on my Facebook ads?",
+    "expected_id": "gmail_17b9683239c1ed58_chunk_3",
+    "source_hint": "Get $5 off Facebook ads"
+  },
+  {
+    "query": "What is the optimal strategy for Max in a game where two players, Max and Min, take turns to maximize and minimize results, and the game tree is searched depth-first?",
+    "expected_id": "gmail_18219b7ba1a26317_att_0_chunk_4",
+    "source_hint": "Document from Imtiaz"
+  },
+  {
+    "query": "What are the details of the passenger 'Meek, Mrs. Thomas (Annie Louise Rowley)'?",
+    "expected_id": "gmail_1821eb7b50de41ce_att_0_chunk_15",
+    "source_hint": "Document from Imtiaz"
+  },
+  {
+    "query": "What is the optimal strategy for Max in a game with an average branching factor of 35 and a depth of around 100, assuming both players play optimally?",
+    "expected_id": "gmail_18219b7ba1a26317_att_0_chunk_5",
+    "source_hint": "Document from Imtiaz"
+  },
+  {
+    "query": "Here's a natural language question that the email answers perfectly:\n\nWhat is the difference between Greedy Search and A* search in the context of informed search algorithms?",
+    "expected_id": "gmail_18219b7ba1a26317_att_0_chunk_0",
+    "source_hint": "Document from Imtiaz"
+  },
+  {
+    "query": "How do I get 50% off using my Faysal Bank Islami Noor card?",
+    "expected_id": "gmail_17b81b699d6599d4_chunk_2",
+    "source_hint": "Reminder: Avail 50% off with Faysal Bank! \ud83e\udd73\ud83c\udf55"
+  },
+  {
+    "query": "What is the translation of Ayat 127 and 128 from Surah Al Nahl in the Quran?",
+    "expected_id": "gmail_17b8e39881798c8d_chunk_0",
+    "source_hint": "Daily Qur'an & Hadith 29 Aug 2021 (20 Muhharam 1443)"
+  },
+  {
+    "query": "What are the products featured in the Discover More section of this email?",
+    "expected_id": "gmail_17ccffe132f69efd_chunk_25",
+    "source_hint": "We've got a treat for you \ud83d\ude1c"
+  }
+]

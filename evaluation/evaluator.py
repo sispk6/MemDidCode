@@ -36,11 +36,10 @@ Return ONLY the integer score (1, 2, 3, 4, or 5).
 Score:"""
 
         try:
-            # We bypass the standard generate_answer to get a raw score
-            if self.brain.provider == 'gemini':
-                response = self.brain.model.generate_content(prompt)
-                score_str = response.text.strip()
-                return int(score_str[0]) if score_str and score_str[0].isdigit() else 1
+            # Use the new generic raw generation from RAGBrain
+            score_str = self.brain.generate_raw(prompt)
+            score_str = score_str.strip()
+            return int(score_str[0]) if score_str and score_str[0].isdigit() else 1
         except Exception:
             return 1
         return 1

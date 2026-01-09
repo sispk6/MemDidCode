@@ -25,14 +25,21 @@ class SyntheticDataGenerator:
         Generate (Query, DocumentID) pairs from a list of messages.
         """
         test_cases = []
-        # Sample messages that have decent length
-        candidates = [m for m in messages if len(m.get('content', '')) > 300]
+        # Sample messages that have decent length - lowered threshold to 100
+        candidates = [m for m in messages if len(m.get('content', '')) > 100]
+        
+        print(f"[DEBUG] Found {len(messages)} total messages, {len(candidates)} candidates > 100 chars")
+        
         if not candidates:
+            print("[DEBUG] No large candidates found, using all messages")
             candidates = messages
             
-        sample_msgs = random.sample(candidates, min(len(candidates), count * 2))
+        if not candidates:
+            return []
+            
+        sample_msgs = random.sample(candidates, min(len(candidates), count * 3))
         
-        print(f"[INFO] Generating {count} synthetic test cases...")
+        print(f"[INFO] Generating up to {count} synthetic test cases from {len(sample_msgs)} samples...")
         
         for msg in sample_msgs:
             if len(test_cases) >= count:
@@ -50,17 +57,21 @@ Content: {content}
 Question:"""
 
             try:
-                if self.brain.provider == 'gemini':
-                    response = self.brain.model.generate_content(prompt)
-                    query = response.text.strip().replace('"', '')
-                    if query:
-                        test_cases.append({
-                            "query": query,
-                            "expected_id": msg['id'],
-                            "source_hint": subject
-                        })
+                # Use the new generic raw generation from RAGBrain
+                query = self.brain.generate_raw(prompt)
+                query = query.strip().replace('"', '')
+                
+                if query:
+                    print(f"   [OK] Generated query: {query[:40]}...")
+                    test_cases.append({
+                        "query": query,
+                        "expected_id": msg['id'],
+                        "source_hint": subject
+                    })
+                else:
+                    print("   [WARN] LLM returned empty query")
             except Exception as e:
-                print(f"[WARN] Failed to generate test case: {e}")
+                print(f"   [WARN] Failed to generate test case: {e}")
                 
         return test_cases
 

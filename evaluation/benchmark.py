@@ -36,22 +36,33 @@ def run_benchmark(user_id: str, test_set_path: str = "evaluation/test_set.json",
     
     # Load or generate test set
     if not Path(test_set_path).exists():
-        print(f"[INFO] Test set {test_set_path} not found. Generating new one...")
+        print(f"[INFO] Test set {test_set_path} not found. Generating new one for user {user_id}...")
         gen = SyntheticDataGenerator()
-        # Fetch some messages to generate from
-        # For simplicity, we assume we can fetch them via vector store or just read raw files
-        # Here we'll just try to fetch a few documents from ChromaDB 
-        # (This is a bit circular but works for metadata-based evaluation)
-        all_docs = vector_store.collection.get(limit=100)
-        messages = []
-        for i in range(len(all_docs['ids'])):
-            messages.append({
-                "id": all_docs['ids'][i],
-                "content": all_docs['documents'][i],
-                "subject": all_docs['metadatas'][i].get('subject', '')
-            })
         
+        # Fetch documents specific to this user
+        all_docs = vector_store.collection.get(
+            where={"user_id": user_id},
+            limit=200
+        )
+        
+        messages = []
+        if all_docs and all_docs['ids']:
+            for i in range(len(all_docs['ids'])):
+                messages.append({
+                    "id": all_docs['ids'][i],
+                    "content": all_docs['documents'][i],
+                    "subject": all_docs['metadatas'][i].get('subject', '')
+                })
+        
+        if not messages:
+            print(f"[ERROR] No messages found for user {user_id} in ChromaDB. Have you run 'python scripts/embed.py --full'?")
+            return {}
+
         test_cases = gen.generate_test_cases(messages, count=num_queries)
+        if not test_cases:
+            print("[ERROR] Failed to generate any test cases. Check your API key and data quality.")
+            return {}
+            
         gen.save_test_set(test_cases, test_set_path)
     else:
         with open(test_set_path, 'r') as f:
@@ -60,7 +71,7 @@ def run_benchmark(user_id: str, test_set_path: str = "evaluation/test_set.json",
             test_cases = test_cases[:num_queries]
 
     print(f"\n{'='*60}")
-    print(f"🚀 RUNNING SEARCH BENCHMARK - {len(test_cases)} Queries")
+    print(f"RUNNING SEARCH BENCHMARK - {len(test_cases)} Queries")
     print(f"{'='*60}\n")
 
     overall_results = []
@@ -95,7 +106,7 @@ def run_benchmark(user_id: str, test_set_path: str = "evaluation/test_set.json",
     final_metrics = aggregate_metrics(overall_results)
     
     print(f"\n{'='*60}")
-    print("📊 FINAL BENCHMARK RESULTS")
+    print("FINAL BENCHMARK RESULTS")
     print(f"{'='*60}")
     for k, v in final_metrics.items():
         print(f"{k.upper():<15}: {v:.3f}")
