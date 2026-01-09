@@ -19,6 +19,14 @@ class SearchEngine:
         """
         self.vector_store = vector_store
         self.embedder = embedder
+        self.reranker = None # Lazy load reranker to save memory/startup time
+    
+    def _get_reranker(self):
+        """Lazy load the reranker"""
+        if self.reranker is None:
+            from src.embeddings.embedder import Reranker
+            self.reranker = Reranker()
+        return self.reranker
     
     def search(self, query_text: str, user_id: str, n_results: int = 10, 
                platform: Optional[str] = None,
@@ -30,7 +38,7 @@ class SearchEngine:
         """
         Search for messages matching the query with optional knowledge-based filters.
         """
-        print(f"🔍 Searching for: '{query_text}'")
+        print(f"[SEARCH] Searching for: '{query_text}'")
         
         # Generate query embedding
         query_embedding = self.embedder.embed_text(query_text)
@@ -53,23 +61,41 @@ class SearchEngine:
         elif len(where) == 1:
             where_clause = where
             
-        # Search in vector store
+        # Stage 1: Fast Retrieval (fetch more candidates for reranking)
+        # We fetch 40 candidates for better recall before reranking
+        initial_n = max(n_results * 4, 40)
+        
         results = self.vector_store.search(
             query_embedding=query_embedding.tolist(),
             user_id=user_id,
-            n_results=n_results,
+            n_results=initial_n,
             where=where_clause
         )
         
-        # Apply date filters if specified
-        if date_from or date_to:
-            results = self._filter_by_date(results, date_from, date_to)
+        # Stage 2: Reranking & Hybrid Scoring
+        if results:
+            # 1. Enhance with full text for reranker
+            enhanced_results = self._enhance_results(results)
+            
+            # 2. Keyterm Boosting (Simple Hybrid)
+            # Give a small boost to matches that contain the exact query words
+            query_terms = set(query_text.lower().split())
+            for res in enhanced_results:
+                text_lower = res['full_text'].lower()
+                matches = sum(1 for term in query_terms if term in text_lower)
+                if matches > 0:
+                    # Apply a small boost (0.02 per matching term)
+                    res['similarity'] += (matches * 0.02)
+            
+            # 3. Cross-Encoder Reranking
+            print(f"[SEARCH] Reranking {len(enhanced_results)} candidates...")
+            reranker = self._get_reranker()
+            enhanced_results = reranker.rerank(query_text, enhanced_results, top_k=n_results)
+            
+            print(f"[OK] Found and reranked {len(enhanced_results)} results")
+            return enhanced_results
         
-        # Enhance results with formatting
-        enhanced_results = self._enhance_results(results)
-        
-        print(f"[OK] Found {len(enhanced_results)} results")
-        return enhanced_results
+        return []
     
     def _filter_by_date(self, results: List[Dict[str, Any]], 
                        date_from: Optional[str], 
@@ -120,6 +146,15 @@ class SearchEngine:
             document = result.get('document', '')
             snippet = document[:200] + "..." if len(document) > 200 else document
             
+            # Re-ranking boost: prioritize email_body over attachment
+            source_type = metadata.get('source_type', 'email_body')
+            filename = metadata.get('filename', '')
+            similarity = result.get('similarity', 0)
+            
+            if source_type == 'email_body':
+                # Slight boost to keep bodies at the top if scores are close
+                similarity += 0.05
+            
             enhanced.append({
                 'id': result['id'],
                 'subject': metadata.get('subject', '(No Subject)'),
@@ -129,10 +164,14 @@ class SearchEngine:
                 'platform': metadata.get('platform', ''),
                 'snippet': snippet,
                 'url': metadata.get('url', ''),
-                'similarity': round(result.get('similarity', 0), 3),
+                'similarity': round(similarity, 3),
+                'source_type': source_type,
+                'filename': filename,
                 'full_text': document
             })
         
+        # Re-sort by boosted similarity
+        enhanced.sort(key=lambda x: x['similarity'], reverse=True)
         return enhanced
     
     def format_results_for_display(self, results: List[Dict[str, Any]]) -> str:
@@ -154,16 +193,23 @@ class SearchEngine:
         output.append(f"{'='*80}\n")
         
         for i, result in enumerate(results, 1):
-            output.append(f"Result #{i} (Similarity: {result['similarity']})")
+            source_info = f" [Source: {result['source_type']}]"
+            if result['filename']:
+                source_info += f" ({result['filename']})"
+                
+            output.append(f"Result #{i} (Score: {result['similarity']}){source_info}")
             output.append(f"  Subject: {result['subject']}")
             output.append(f"  From: {result['sender']} ({result['sender_email']})")
             output.append(f"  Date: {result['date']}")
             output.append(f"  Platform: {result['platform']}")
-            output.append(f"  Snippet: {result['snippet']}")
+            
+            # Sanitize snippet for Windows terminal (replace non-encodable chars)
+            clean_snippet = result['snippet'].encode('ascii', 'replace').decode('ascii')
+            output.append(f"  Snippet: {clean_snippet}")
             
             if result['url']:
                 output.append(f"  Link: {result['url']}")
             
             output.append(f"{'-'*80}\n")
         
-        return '\n'.join(output)
+        return '\n'.join(output).replace('\U0001f504', '[SYNC]').replace('\U0001f50d', '[SEARCH]')

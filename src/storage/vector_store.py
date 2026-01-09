@@ -147,10 +147,12 @@ class VectorStore:
                     # Context
                     "thread_id": msg.get('thread_id', ''),
                     
-                    # Chunking metadata (NEW)
+                    # Chunking metadata
                     "chunk_index": str(msg.get('chunk_index', 0)),
                     "total_chunks": str(msg.get('total_chunks', 1)),
                     "original_id": msg.get('original_id', msg['id']),
+                    "source_type": msg.get('source_type', 'email_body'),
+                    "filename": msg.get('filename', ''),
                     
                     # Access
                     "url": msg.get('url', ''),

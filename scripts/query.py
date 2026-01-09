@@ -41,7 +41,7 @@ def main():
     storage_config = config['storage']
     
     # Initialize components
-    print("🔄 Initializing search engine...")
+    print("[INFO] Initializing search engine...")
     
     embedder = Embedder(model_name=embeddings_config['model_name'])
     

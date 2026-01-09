@@ -158,8 +158,9 @@ class TextChunker:
                 chunked_att['source_type'] = 'attachment'
                 chunked_att['filename'] = att_name
                 
-                # Prepend filename for context in embedding
-                chunked_att['embedding_text'] = f"Attachment: {att_name}\n\n{chunk}"
+                # Context enrichment: Prepend subject/sender and filename for better retrieval
+                parent_context = f"Email Subject: {subject}\nFrom: {base_meta.get('sender_name', '')}\n" if subject else ""
+                chunked_att['embedding_text'] = f"{parent_context}Attachment: {att_name}\n\n{chunk}"
                 
                 all_chunks.append(chunked_att)
         

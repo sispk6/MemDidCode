@@ -105,6 +105,9 @@ class MessageCleaner:
         subject = MessageCleaner.clean_text(subject)
         content = MessageCleaner.clean_text(content)
         
+        # Remove quoted reply text to reduce noise in embeddings
+        content = MessageCleaner.remove_quoted_text(content)
+        
         # Combine subject and content (NO truncation - chunking handles this)
         combined = f"{subject}\n\n{content}" if subject else content
         

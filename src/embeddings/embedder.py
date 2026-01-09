@@ -2,7 +2,8 @@
 Embedding generator using sentence-transformers.
 Path: src/embeddings/embedder.py
 """
-from typing import List, Union
+import torch
+from typing import List, Union, Dict, Any
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
@@ -125,3 +126,52 @@ class Embedder:
             return 0.0
         
         return dot_product / (norm1 * norm2)
+
+
+class Reranker:
+    """Re-rank search results using a Cross-Encoder for higher precision"""
+    
+    def __init__(self, model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"):
+        """
+        Initialize the Reranker with a Cross-Encoder model.
+        
+        Args:
+            model_name: Cross-Encoder model name
+        """
+        from sentence_transformers import CrossEncoder
+        print(f"[INFO] Loading reranker model: {model_name}...")
+        self.model = CrossEncoder(model_name)
+        print("[OK] Reranker model loaded.")
+
+    def rerank(self, query: str, documents: List[Dict[str, Any]], top_k: int = 10) -> List[Dict[str, Any]]:
+        """
+        Re-score and re-sort documents based on exact query relevance.
+        
+        Args:
+            query: User's search query
+            documents: List of candidate document dictionaries
+            top_k: Number of results to return after reranking
+            
+        Returns:
+            Re-ranked list of top_k documents
+        """
+        if not documents:
+            return []
+            
+        # Prepare pairs for cross-encoder
+        # (query, text) pairs
+        pairs = [[query, doc.get('full_text', doc.get('document', ''))] for doc in documents]
+        
+        # Predict scores
+        scores = self.model.predict(pairs)
+        
+        # Update scores in documents
+        for doc, score in zip(documents, scores):
+            doc['rerank_score'] = float(score)
+            # Use rerank score as the primary similarity metric for display
+            doc['similarity'] = round(float(score), 3) 
+            
+        # Sort by rerank score descending
+        reranked = sorted(documents, key=lambda x: x['rerank_score'], reverse=True)
+        
+        return reranked[:top_k]
