@@ -1,0 +1,80 @@
+{
+  "timestamp": 1768041185.0682387,
+  "config": {
+    "num_queries": 15,
+    "metrics": [
+      "mrr",
+      "p@5",
+      "llm",
+      "latency"
+    ]
+  },
+  "aggregated_metrics": {
+    "mrr": 0.36428571428571427,
+    "precision@5": 0.4,
+    "latency_ms": 5569.329714775085,
+    "llm_relevance": 3.166666666666667
+  },
+  "per_query_results": [
+    {
+      "mrr": 1.0,
+      "precision@5": 1.0,
+      "latency_ms": 9143.320322036743,
+      "llm_relevance": 4.0
+    },
+    {
+      "mrr": 0.0,
+      "precision@5": 0.0,
+      "latency_ms": 6896.345138549805,
+      "llm_relevance": 2.0
+    },
+    {
+      "mrr": 0.0,
+      "precision@5": 0.0,
+      "latency_ms": 6631.640195846558,
+      "llm_relevance": 3.3333333333333335
+    },
+    {
+      "mrr": 0.3333333333333333,
+      "precision@5": 1.0,
+      "latency_ms": 6654.701709747314,
+      "llm_relevance": 4.0
+    },
+    {
+      "mrr": 0.0,
+      "precision@5": 0.0,
+      "latency_ms": 6177.432060241699,
+      "llm_relevance": 3.0
+    },
+    {
+      "mrr": 1.0,
+      "precision@5": 1.0,
+      "latency_ms": 3899.5306491851807,
+      "llm_relevance": 4.0
+    },
+    {
+      "mrr": 0.16666666666666666,
+      "precision@5": 0.0,
+      "latency_ms": 3981.590509414673,
+      "llm_relevance": 5.0
+    },
+    {
+      "mrr": 0.14285714285714285,
+      "precision@5": 0.0,
+      "latency_ms": 3973.5679626464844,
+      "llm_relevance": 3.3333333333333335
+    },
+    {
+      "mrr": 1.0,
+      "precision@5": 1.0,
+      "latency_ms": 4487.936496734619,
+      "llm_relevance": 1.0
+    },
+    {
+      "mrr": 0.0,
+      "precision@5": 0.0,
+      "latency_ms": 3847.2321033477783,
+      "llm_relevance": 2.0
+    }
+  ]
+}

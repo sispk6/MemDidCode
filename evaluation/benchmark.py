@@ -19,11 +19,16 @@ from evaluation.metrics import calculate_mrr, calculate_precision_at_k, aggregat
 from evaluation.evaluator import LLMJudge
 from evaluation.synthetic_data import SyntheticDataGenerator
 
-def run_benchmark(user_id: str, test_set_path: str = "evaluation/test_set.json", num_queries: int = 10):
+
+def run_benchmark(user_id: str, test_set_path: str = "evaluation/test_set.json", num_queries: int = 10, metrics: List[str] = None, save_path: str = None):
     """
     Run the benchmark on a set of queries.
     """
     config = load_config()
+    
+    # Default metrics
+    if metrics is None:
+        metrics = ["mrr", "p@5", "llm", "latency"]
     
     # Initialize Search
     embedder = Embedder(model_name=config['embeddings']['model_name'])
@@ -32,7 +37,10 @@ def run_benchmark(user_id: str, test_set_path: str = "evaluation/test_set.json",
         collection_name=config['storage']['collection_name']
     )
     search_engine = SearchEngine(vector_store, embedder)
-    judge = LLMJudge()
+    
+    judge = None
+    if "llm" in metrics:
+        judge = LLMJudge()
     
     # Load or generate test set
     if not Path(test_set_path).exists():
@@ -86,21 +94,31 @@ def run_benchmark(user_id: str, test_set_path: str = "evaluation/test_set.json",
         results = search_engine.search(query, user_id=user_id, n_results=10)
         latency = (time.time() - start_time) * 1000  # ms
         
+        query_metrics = {}
+        
         # Calculate Technical Metrics
-        mrr = calculate_mrr(results, expected_id)
-        p5 = calculate_precision_at_k(results, expected_id, k=5)
+        if "mrr" in metrics:
+            query_metrics["mrr"] = calculate_mrr(results, expected_id)
+        if "p@5" in metrics:
+            query_metrics["precision@5"] = calculate_precision_at_k(results, expected_id, k=5)
+        if "latency" in metrics:
+            query_metrics["latency_ms"] = latency
         
         # LLM Relevance Score (1-5)
-        llm_score = judge.evaluate_results(query, results)
+        if "llm" in metrics and judge:
+            llm_score = judge.evaluate_results(query, results)
+            query_metrics["llm_relevance"] = llm_score
         
-        metrics = {
-            "mrr": mrr,
-            "precision@5": p5,
-            "llm_relevance": llm_score,
-            "latency_ms": latency
-        }
-        overall_results.append(metrics)
-        print(f"   Done. MRR: {mrr:.2f} | P@5: {p5:.2f} | Rating: {llm_score:.1f} | Latency: {latency:.0f}ms")
+        overall_results.append(query_metrics)
+        
+        # Print summary line
+        parts = []
+        if "mrr" in metrics: parts.append(f"MRR: {query_metrics['mrr']:.2f}")
+        if "p@5" in metrics: parts.append(f"P@5: {query_metrics['precision@5']:.2f}")
+        if "llm" in metrics: parts.append(f"Rating: {query_metrics.get('llm_relevance', 0):.1f}")
+        if "latency" in metrics: parts.append(f"Latency: {latency:.0f}ms")
+        
+        print(f"   Done. {' | '.join(parts)}")
 
     # Aggregate
     final_metrics = aggregate_metrics(overall_results)
@@ -112,12 +130,36 @@ def run_benchmark(user_id: str, test_set_path: str = "evaluation/test_set.json",
         print(f"{k.upper():<15}: {v:.3f}")
     print(f"{'='*60}\n")
     
+    # Save results
+    if save_path:
+        output_data = {
+            "timestamp": time.time(),
+            "config": {
+                "num_queries": num_queries,
+                "metrics": metrics
+            },
+            "aggregated_metrics": final_metrics,
+            "per_query_results": overall_results
+        }
+        
+        # Create directory if needed
+        Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+        
+        with open(save_path, 'w') as f:
+            import json
+            json.dump(output_data, f, indent=2)
+        print(f"[INFO] Results saved to {save_path}")
+
     return final_metrics
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--user-id", type=str, required=True)
     parser.add_argument("--num-queries", type=int, default=5)
+    parser.add_argument("--metrics", type=str, default="mrr,p@5,llm,latency", help="Comma-separated list of metrics to calculate")
+    parser.add_argument("--save-path", type=str, default=None, help="Path to save results JSON")
     args = parser.parse_args()
     
-    run_benchmark(args.user_id, num_queries=args.num_queries)
+    metrics_list = [m.strip() for m in args.metrics.split(",")]
+    
+    run_benchmark(args.user_id, num_queries=args.num_queries, metrics=metrics_list, save_path=args.save_path)

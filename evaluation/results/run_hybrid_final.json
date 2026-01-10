@@ -1,0 +1,68 @@
+{
+  "timestamp": 1768038908.5894346,
+  "config": {
+    "num_queries": 15,
+    "metrics": [
+      "mrr",
+      "p@5",
+      "latency"
+    ]
+  },
+  "aggregated_metrics": {
+    "mrr": 0.35,
+    "precision@5": 0.4,
+    "latency_ms": 15350.618815422058
+  },
+  "per_query_results": [
+    {
+      "mrr": 1.0,
+      "precision@5": 1.0,
+      "latency_ms": 18327.049255371094
+    },
+    {
+      "mrr": 0.0,
+      "precision@5": 0.0,
+      "latency_ms": 15691.945552825928
+    },
+    {
+      "mrr": 0.0,
+      "precision@5": 0.0,
+      "latency_ms": 26933.64405632019
+    },
+    {
+      "mrr": 0.3333333333333333,
+      "precision@5": 1.0,
+      "latency_ms": 13019.190311431885
+    },
+    {
+      "mrr": 0.0,
+      "precision@5": 0.0,
+      "latency_ms": 12795.750141143799
+    },
+    {
+      "mrr": 1.0,
+      "precision@5": 1.0,
+      "latency_ms": 12121.241569519043
+    },
+    {
+      "mrr": 0.16666666666666666,
+      "precision@5": 0.0,
+      "latency_ms": 11191.232204437256
+    },
+    {
+      "mrr": 0.0,
+      "precision@5": 0.0,
+      "latency_ms": 14071.746826171875
+    },
+    {
+      "mrr": 1.0,
+      "precision@5": 1.0,
+      "latency_ms": 14471.460342407227
+    },
+    {
+      "mrr": 0.0,
+      "precision@5": 0.0,
+      "latency_ms": 14882.927894592285
+    }
+  ]
+}

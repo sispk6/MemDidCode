@@ -1,0 +1,74 @@
+
+[DEBUG] Query: What is the best way for me to host a traditional Indian dinner party with minimal effort using a meal delivery service?
+[DEBUG] Expected ID: gmail_17b9142fdec6f1d1_chunk_1
+RRF Rank: -1
+Final Rank: -1
+
+Top 10 Final Results:
+1. ID: gmail_17f9b884bcd93acc_chunk_0 | Similarity: -9.977
+   Subject: 
+   Snippet:  Regards, *Waleed Ahmed Malik* +923455197740 
+2. ID: gmail_17e09e0ccffe7e2d_chunk_0 | Similarity: -9.985
+   Subject: Aoa
+   Snippet: Aoa Aoa  Aoa    Kindly call us at 9201555 AH 
+3. ID: gmail_17b9142fdec6f1d1_chunk_5 | Similarity: -10.719
+   Subject: Throw a dawat with Home Chef! 💖💖
+   Snippet: Throw a dawat with Home Chef! 💖💖 SMPF62He8dNpgZUAtNQigAye-2BpfDG-2Bz2FObgQTVEmqB-2B2uhR2fsWVUPG3eAPN3nl02Ehh-2F84XIbb-2BumHCXRtSDmFm7HvTzuac1zOkCaPVl1
+4. ID: gmail_181cc25222a49c74_att_0_chunk_1 | Similarity: -10.93
+   Subject: Fwd: Request for Quotations
+   Snippet: Fwd: Request for Quotations ces • Duration: 4 Days • Weekend Program: 2 x Sat / Sun • Timings: 9 A.M –5 P.M • Attendees: Project Related Personnel, No
+5. ID: gmail_17b989eb8d9a9e17_chunk_0 | Similarity: -10.944
+   Subject: Choose How You Want to Make Payments
+   Snippet: Choose How You Want to Make Payments Choose How You Want to Make Payments  Choose a Payment term that best aligns the delivery of work with a payment
+6. ID: gmail_17b9142fdec6f1d1_chunk_4 | Similarity: -10.99
+   Subject: Throw a dawat with Home Chef! 💖💖
+   Snippet: Throw a dawat with Home Chef! 💖💖 127UHOIbDAX0V359MXirlLDHBbxNKsF78WZlZSU7T8E8dFfDc4skBB6eyLvF0L5tAQUjshCnO6XjbA8SuKFHh4c8X-2BcuOFukQpixu-2BsgGe-2B0-2B
+7. ID: gmail_17b9142fdec6f1d1_chunk_0 | Similarity: -11.087
+   Subject: Throw a dawat with Home Chef! 💖💖
+   Snippet: Throw a dawat with Home Chef! 💖💖 Throw a dawat with Home Chef! 💖💖              foodpanda    * { font-family: 'Roboto', Arial; }   * @impo
+8. ID: gmail_17b81b699d6599d4_chunk_5 | Similarity: -11.096
+   Subject: Reminder: Avail 50% off with Faysal Bank! 🥳🍕
+   Snippet: Reminder: Avail 50% off with Faysal Bank! 🥳🍕 93NBGNKYwZVtaJhfvC90CNSgnaVDBBtMAaSFIWcpaVsGPXKXbeMNWm6p-2FMgfQtxJ4DoZsdFTQfcGcbTJRvsn1ToafEShrTxlogy3JRR
+9. ID: gmail_18cb1595960f6107_att_0_chunk_2 | Similarity: -11.154
+   Subject: Document from Imtiaz
+   Snippet: Document from Imtiaz n that differs from the one used in training. Mitigation strategy: We will use a self-supervised learning framework for fine-tuni
+10. ID: gmail_1869f12b149fafc8_att_0_chunk_0 | Similarity: -11.166
+   Subject: 
+   Snippet:  Adeeba Naseer Shah Primary Address: House #102, Streat#1 PIA Colony Misrial Road, Rawalpindi, Pakistan. Email: Adeeba.shah92@yahool.com Professional 
+
+[DEBUG] Query: How do I get a $5 discount on my Facebook ads?
+[DEBUG] Expected ID: gmail_17b9683239c1ed58_chunk_3
+RRF Rank: 6
+Final Rank: -1
+
+Top 10 Final Results:
+1. ID: gmail_17b9683239c1ed58_chunk_0 | Similarity: 5.083
+   Subject: Get $5 off Facebook ads
+   Snippet: Get $5 off Facebook ads Get $5 off Facebook ads  <html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><meta name="viewport
+2. ID: gmail_17b9683239c1ed58_chunk_1 | Similarity: 4.932
+   Subject: Get $5 off Facebook ads
+   Snippet: Get $5 off Facebook ads e-height:1px; max-height:0px; max-width:0px; opacity:0; overflow:hidden;background-color: #fff;" width="100%"><tr><td> Discove
+3. ID: gmail_17b9683239c1ed58_chunk_12 | Similarity: 4.551
+   Subject: Get $5 off Facebook ads
+   Snippet: Get $5 off Facebook ads %;">Claim $5</a></td></tr></table></td></tr><tr align="center"><td style="width:100%;height:3px;"></td></tr></table></td></tr>
+4. ID: gmail_17b9683239c1ed58_chunk_2 | Similarity: 4.534
+   Subject: Get $5 off Facebook ads
+   Snippet: Get $5 off Facebook ads t-family:ArialMT, Arial, sans-serif;font-weight:light;line-height:36px;font-size: 32px; line-height: 42px; color: #344854;">Gr
+5. ID: gmail_17b9683239c1ed58_chunk_11 | Similarity: 4.481
+   Subject: Get $5 off Facebook ads
+   Snippet: Get $5 off Facebook ads 317777.AbxFJTu5Oek8X-B9oeA&amp;n_m=imtiazhashmi%40gmail.com&amp;rms=v2">Facebook for Business</a> to learn more about setting 
+6. ID: gmail_17b9683239c1ed58_chunk_9 | Similarity: 4.198
+   Subject: Get $5 off Facebook ads
+   Snippet: Get $5 off Facebook ads 63200823757902&amp;aref=7935935639844152303&amp;medium=email&amp;mid=5cac3a6501a4fG2d2b69b8G6e221b6b0545e3efG2d8&amp;bcode=2.1
+7. ID: gmail_17b9683239c1ed58_chunk_13 | Similarity: 4.052
+   Subject: Get $5 off Facebook ads
+   Snippet: Get $5 off Facebook ads enter" style="max-width:600px;width:100%;" cellpadding="0" cellspacing="0" border="0"><tr align="center"><td style="max-width:
+8. ID: gmail_17b9683239c1ed58_chunk_7 | Similarity: 3.77
+   Subject: Get $5 off Facebook ads
+   Snippet: Get $5 off Facebook ads idth:600px;width:100%;" cellpadding="0" cellspacing="0" border="0"><tr align="center"><td style="max-width:600px;padding:50px 
+9. ID: gmail_17b9683239c1ed58_chunk_6 | Similarity: 3.562
+   Subject: Get $5 off Facebook ads
+   Snippet: Get $5 off Facebook ads 100%;" alt="Post Image" title="Post Image" /></a></div></td></tr></table></div><table border="0" cellpadding="0" cellspacing="
+10. ID: gmail_17b9683239c1ed58_chunk_15 | Similarity: 3.458
+   Subject: Get $5 off Facebook ads
+   Snippet: Get $5 off Facebook ads t:15px;"></td></tr></table><table align="center" border="0" cellpadding="0" cellspacing="0" style="width:100%;"><tr align="cen

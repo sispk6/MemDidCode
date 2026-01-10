@@ -1,0 +1,43 @@
+{
+  "timestamp": 1768037784.1103394,
+  "config": {
+    "num_queries": 5,
+    "metrics": [
+      "mrr",
+      "p@5",
+      "latency"
+    ]
+  },
+  "aggregated_metrics": {
+    "mrr": 0.26666666666666666,
+    "precision@5": 0.4,
+    "latency_ms": 9285.313272476196
+  },
+  "per_query_results": [
+    {
+      "mrr": 1.0,
+      "precision@5": 1.0,
+      "latency_ms": 13586.918592453003
+    },
+    {
+      "mrr": 0.0,
+      "precision@5": 0.0,
+      "latency_ms": 9586.80772781372
+    },
+    {
+      "mrr": 0.0,
+      "precision@5": 0.0,
+      "latency_ms": 9112.578630447388
+    },
+    {
+      "mrr": 0.3333333333333333,
+      "precision@5": 1.0,
+      "latency_ms": 6866.024494171143
+    },
+    {
+      "mrr": 0.0,
+      "precision@5": 0.0,
+      "latency_ms": 7274.2369174957275
+    }
+  ]
+}

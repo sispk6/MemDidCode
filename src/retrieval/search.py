@@ -20,6 +20,7 @@ class SearchEngine:
         self.vector_store = vector_store
         self.embedder = embedder
         self.reranker = None # Lazy load reranker to save memory/startup time
+        self._bm25_cache = {} # (user_id, filters_hash) -> (bm25, corpus_data)
     
     def _get_reranker(self):
         """Lazy load the reranker"""
@@ -27,6 +28,35 @@ class SearchEngine:
             from src.embeddings.embedder import Reranker
             self.reranker = Reranker()
         return self.reranker
+    
+    def rrf_merge(self, vector_results: List[Dict[str, Any]], bm25_results: List[Dict[str, Any]], k: int = 60) -> List[Dict[str, Any]]:
+        """Merge results using Reciprocal Rank Fusion (RRF)"""
+        scores = {} # id -> rrf_score
+        all_docs = {} # id -> doc_data
+        
+        # Process Vector Results
+        for rank, res in enumerate(vector_results, 1):
+            doc_id = res['id']
+            scores[doc_id] = scores.get(doc_id, 0) + 1.0 / (k + rank)
+            all_docs[doc_id] = res
+            
+        # Process BM25 Results
+        for rank, res in enumerate(bm25_results, 1):
+            doc_id = res['id']
+            scores[doc_id] = scores.get(doc_id, 0) + 1.0 / (k + rank)
+            if doc_id not in all_docs:
+                all_docs[doc_id] = res
+                
+        # Sort by RRF score
+        merged_ids = sorted(scores.keys(), key=lambda x: scores[x], reverse=True)
+        
+        merged_results = []
+        for doc_id in merged_ids:
+            doc = all_docs[doc_id]
+            doc['similarity'] = scores[doc_id] 
+            merged_results.append(doc)
+            
+        return merged_results
     
     def search(self, query_text: str, user_id: str, n_results: int = 10, 
                platform: Optional[str] = None,
@@ -38,62 +68,60 @@ class SearchEngine:
         """
         Search for messages matching the query with optional knowledge-based filters.
         """
-        print(f"[SEARCH] Searching for: '{query_text}'")
+        print(f"[SEARCH] Hybrid searching for: '{query_text}'")
         
-        # Generate query embedding
-        query_embedding = self.embedder.embed_text(query_text)
-        
-        # Build metadata filters
+        # Build metadata filters for Stage 1 Vector Search
         where = {}
-        if platform:
-            where['platform'] = platform
-        if sender:
-            where['sender_email'] = sender
-        if entity_id:
-            where['sender_entity_id'] = entity_id
-        if org:
-            where['sender_org'] = org
+        if platform: where['platform'] = platform
+        if sender: where['sender_email'] = sender
+        if entity_id: where['sender_entity_id'] = entity_id
+        if org: where['sender_org'] = org
             
-        # Handle multiple filters for ChromaDB
         where_clause = None
         if len(where) > 1:
             where_clause = {"$and": [{k: v} for k, v in where.items()]}
         elif len(where) == 1:
             where_clause = where
-            
-        # Stage 1: Fast Retrieval (fetch more candidates for reranking)
-        # We fetch 40 candidates for better recall before reranking
-        initial_n = max(n_results * 4, 40)
-        
-        results = self.vector_store.search(
-            query_embedding=query_embedding.tolist(),
+
+        # --- Stage 1: Parallel Retrieval ---
+        # Fetch MORE candidates for better recall (increase from 60 to 100)
+        print(f"[SEARCH] Fetching vector candidates...")
+        vector_results = self.vector_store.search(
+            query_embedding=self.embedder.embed_text(query_text).tolist(),
             user_id=user_id,
-            n_results=initial_n,
+            n_results=100,
             where=where_clause
         )
         
-        # Stage 2: Reranking & Hybrid Scoring
-        if results:
-            # 1. Enhance with full text for reranker
-            enhanced_results = self._enhance_results(results)
+        # Fetch 100 candidates from BM25 Search (using persistent index in vector_store)
+        print(f"[SEARCH] Fetching BM25 candidates...")
+        bm25_results = self.vector_store.search_bm25(query_text, user_id, n_results=100)
+        
+        # Apply metadata filters to BM25 if any (since search_bm25 uses full user corpus)
+        if where: # Using 'where' dict instead of 'where_clause'
+            bm25_results = [r for r in bm25_results if all(str(r['metadata'].get(k)) == str(v) for k, v in where.items())]
+
+        # --- Stage 2: Merge with RRF ---
+        print(f"[SEARCH] Merging results with RRF...")
+        merged_results = self.rrf_merge(vector_results, bm25_results)
+        
+        # --- Stage 3: Reranking & Hybrid Scoring ---
+        if merged_results:
+            # 1. Enhance with snippets & formatting
+            # Note: _enhance_results now maintains RRF scores without artificial boosts
+            enhanced_results = self._enhance_results(merged_results)
             
-            # 2. Keyterm Boosting (Simple Hybrid)
-            # Give a small boost to matches that contain the exact query words
-            query_terms = set(query_text.lower().split())
-            for res in enhanced_results:
-                text_lower = res['full_text'].lower()
-                matches = sum(1 for term in query_terms if term in text_lower)
-                if matches > 0:
-                    # Apply a small boost (0.02 per matching term)
-                    res['similarity'] += (matches * 0.02)
+            # 2. Limit candidates to top 30 for the final reranking step
+            # This reduces noise and improves speed.
+            candidates_to_rerank = enhanced_results[:30]
             
-            # 3. Cross-Encoder Reranking
-            print(f"[SEARCH] Reranking {len(enhanced_results)} candidates...")
+            # 3. Cross-Encoder Reranking (The final quality step)
+            print(f"[SEARCH] Reranking {len(candidates_to_rerank)} candidates...")
             reranker = self._get_reranker()
-            enhanced_results = reranker.rerank(query_text, enhanced_results, top_k=n_results)
+            final_results = reranker.rerank(query_text, candidates_to_rerank, top_k=n_results)
             
-            print(f"[OK] Found and reranked {len(enhanced_results)} results")
-            return enhanced_results
+            print(f"[OK] Found and reranked {len(final_results)} results")
+            return final_results
         
         return []
     
@@ -146,14 +174,8 @@ class SearchEngine:
             document = result.get('document', '')
             snippet = document[:200] + "..." if len(document) > 200 else document
             
-            # Re-ranking boost: prioritize email_body over attachment
-            source_type = metadata.get('source_type', 'email_body')
-            filename = metadata.get('filename', '')
+            # Similarity here is the RRF score. No arbitrary boosting.
             similarity = result.get('similarity', 0)
-            
-            if source_type == 'email_body':
-                # Slight boost to keep bodies at the top if scores are close
-                similarity += 0.05
             
             enhanced.append({
                 'id': result['id'],
@@ -165,8 +187,8 @@ class SearchEngine:
                 'snippet': snippet,
                 'url': metadata.get('url', ''),
                 'similarity': round(similarity, 3),
-                'source_type': source_type,
-                'filename': filename,
+                'source_type': metadata.get('source_type', 'email_body'),
+                'filename': metadata.get('filename', ''),
                 'full_text': document
             })
         

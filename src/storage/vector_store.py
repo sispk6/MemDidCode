@@ -8,6 +8,10 @@ from typing import Dict, List, Optional, Any, Union
 from src.storage.knowledge_base import KnowledgeBase
 import chromadb
 from chromadb.config import Settings
+import os
+import pickle
+import re
+from rank_bm25 import BM25Okapi
 
 
 class VectorStore:
@@ -41,6 +45,10 @@ class VectorStore:
         
         print(f"[OK] ChromaDB initialized. Collection: {collection_name}")
         print(f"   Current document count: {self.collection.count()}")
+        
+        # BM25 Index path
+        self.bm25_dir = os.path.join(persist_directory, "bm25")
+        os.makedirs(self.bm25_dir, exist_ok=True)
     
     def add_messages(self, messages: List[Dict[str, Any]], user_id: str) -> bool:
         """
@@ -169,6 +177,11 @@ class VectorStore:
             
             print(f"[OK] Successfully added {len(messages)} messages")
             print(f"   Total documents in collection: {self.collection.count()}")
+            
+            # --- PHASE: Storage (Hybrid) ---
+            # Update BM25 index for this user
+            self.update_bm25_index(user_id)
+            
             return True
             
         except Exception as e:
@@ -224,6 +237,84 @@ class VectorStore:
         except Exception as e:
             print(f"[ERROR] Error searching: {e}")
             return []
+
+    # --- BM25 PERSISTENT METHODS ---
+    
+    def _get_bm25_path(self, user_id: str):
+        """Get the path to a user's BM25 index"""
+        return os.path.join(self.bm25_dir, f"bm25_{user_id}.pkl")
+
+    def _tokenize(self, text):
+        """Standard tokenizer for BM25 and Hybrid Search"""
+        return [t for t in re.findall(r'\w+', text.lower()) if t]
+
+    def update_bm25_index(self, user_id: str):
+        """Rebuild and persist the BM25 index for a user"""
+        print(f"[STORAGE] Refreshing BM25 index for user {user_id}...")
+        
+        # Fetch ALL documents for this user (up to 10k)
+        results = self.collection.get(
+            where={"user_id": user_id},
+            include=['documents', 'metadatas'],
+            limit=10000
+        )
+        
+        if not results['ids']:
+            print(f"[STORAGE] No documents for user {user_id}, skipping BM25")
+            return
+            
+        corpus = results['documents']
+        tokenized_corpus = [self._tokenize(doc) for doc in corpus]
+        bm25 = BM25Okapi(tokenized_corpus)
+        
+        # Save index and corpus data
+        data = {
+            'bm25': bm25,
+            'corpus': corpus,
+            'metadatas': results['metadatas'],
+            'ids': results['ids']
+        }
+        
+        path = self._get_bm25_path(user_id)
+        with open(path, 'wb') as f:
+            pickle.dump(data, f)
+            
+        print(f"[STORAGE] BM25 index saved for {user_id} ({len(corpus)} docs)")
+
+    def search_bm25(self, query_text: str, user_id: str, n_results: int = 10) -> List[Dict[str, Any]]:
+        """Perform keyword search using persistent BM25 index"""
+        path = self._get_bm25_path(user_id)
+        if not os.path.exists(path):
+            # If index doesn't exist, try to build it once
+            self.update_bm25_index(user_id)
+            if not os.path.exists(path): return []
+            
+        with open(path, 'rb') as f:
+            data = pickle.load(f)
+            
+        bm25 = data['bm25']
+        
+        tokenized_query = self._tokenize(query_text)
+        if not tokenized_query:
+            return []
+            
+        scores = bm25.get_scores(tokenized_query)
+        
+        import numpy as np
+        top_indices = np.argsort(scores)[::-1][:n_results]
+        
+        results = []
+        for idx in top_indices:
+            if scores[idx] <= 0: continue
+            results.append({
+                'id': data['ids'][idx],
+                'document': data['corpus'][idx],
+                'metadata': data['metadatas'][idx],
+                'bm25_score': float(scores[idx]),
+                'similarity': float(scores[idx]) # Map to similarity for blending
+            })
+            
+        return results
     
     def get_by_id(self, message_id: str) -> Optional[Dict[str, Any]]:
         """

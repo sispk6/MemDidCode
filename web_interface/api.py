@@ -1,6 +1,7 @@
 import os
 import sys
 import subprocess
+import time
 from typing import List, Dict, Any, Optional
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Request, Depends
 from fastapi.staticfiles import StaticFiles
@@ -24,6 +25,7 @@ from src.retrieval.brain import RAGBrain
 from src.storage.knowledge_base import KnowledgeBase
 from src.ingest.gmail_connector import GmailConnector
 from src.utils.config_loader import load_config
+from evaluation.benchmark import run_benchmark
 
 
 
@@ -77,6 +79,11 @@ class RegisterRequest(BaseModel):
     username: str
     password: str
     display_name: Optional[str] = None
+
+class EvaluationRequest(BaseModel):
+    num_queries: int = 5
+    metrics: List[str] = ["mrr", "p@5", "llm", "latency"]
+    save_results: bool = True
 
 # Initialization
 config = load_config()
@@ -345,6 +352,36 @@ async def get_entities(user_id: str = Depends(get_user_id)):
         entities = kb.get_all_entities(user_id=user_id) # Pass user_id to KB
         return {"entities": entities}
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/evaluate")
+async def evaluate(request: EvaluationRequest, user_id: str = Depends(get_user_id)):
+    """Run search quality benchmark for the user."""
+    try:
+        # Define save path if requested
+        save_path = None
+        if request.save_results:
+            timestamp = int(time.time())
+            save_path = f"evaluation/results/eval_{user_id}_{timestamp}.json"
+        
+        # Run the benchmark
+        # Note: This is a synchronous call that might take some time (LLM judging)
+        # For a better UX in a real app, this should be a background task with status polling
+        results = run_benchmark(
+            user_id=user_id,
+            num_queries=request.num_queries,
+            metrics=request.metrics,
+            save_path=save_path
+        )
+        
+        return {
+            "status": "success",
+            "results": results,
+            "save_path": save_path
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/stats")
