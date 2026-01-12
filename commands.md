@@ -13,14 +13,13 @@
 memoenv\Scripts\python.exe scripts\reset_db.py "465aaa1c-beb9-48d7-932a-31d11760e764"
 
 
-memoenv\Scripts\python.exe scripts\ingest.py --full --user-id "465aaa1c-beb9-48d7-932a-3
-1d11760e764"
+memoenv\Scripts\python.exe scripts\ingest.py --full --user-id "465aaa1c-beb9-48d7-932a-31d11760e764"
 
 python scripts/embed.py --full --user-id 465aaa1c-beb9-48d7-932a-31d11760e764
 
 
 python .\evaluation
-\synthetic_data.py --user-id 465aaa1c-beb9-48d7-932a-31d11760e764
+\synthetic_data.py --user-id465aaa1c-beb9-48d7-932a-31d11760e764
 
  .\memoenv\Scripts\python evaluation\benchmark.py --user-id 465aaa1c-beb9-48d7-932a-31d11760e764 --num-queries 15
 
@@ -57,3 +56,9 @@ MRR            : 0.364
 PRECISION@5    : 0.400
 LATENCY_MS     : 5569.330
 LLM_RELEVANCE  : 3.167
+
+#reset the database , ingest and embed
+
+MRR            : 0.380
+PRECISION@5    : 0.500
+LATENCY_MS     : 4208.720

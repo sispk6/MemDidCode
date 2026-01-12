@@ -57,6 +57,22 @@ class SearchEngine:
             merged_results.append(doc)
             
         return merged_results
+
+    def _apply_diversity(self, results: List[Dict[str, Any]], max_per_source: int = 3) -> List[Dict[str, Any]]:
+        """Limit the number of chunks from the same document/source to ensure variety"""
+        diverse_results = []
+        source_counts = {} # original_id -> count
+        
+        for res in results:
+            original_id = res.get('metadata', {}).get('original_id', res.get('id'))
+            count = source_counts.get(original_id, 0)
+            
+            if count < max_per_source:
+                diverse_results.append(res)
+                source_counts[original_id] = count + 1
+            # else: skip this chunk as it's repetitive
+            
+        return diverse_results
     
     def search(self, query_text: str, user_id: str, n_results: int = 10, 
                platform: Optional[str] = None,
@@ -107,15 +123,18 @@ class SearchEngine:
         
         # --- Stage 3: Reranking & Hybrid Scoring ---
         if merged_results:
-            # 1. Enhance with snippets & formatting
-            # Note: _enhance_results now maintains RRF scores without artificial boosts
-            enhanced_results = self._enhance_results(merged_results)
+            # 1. Apply Diversity Filtering (Candidate level)
+            # Ensure we don't send 30 chunks of the same PDF to the reranker
+            diverse_candidates = self._apply_diversity(merged_results, max_per_source=3)
             
-            # 2. Limit candidates to top 30 for the final reranking step
-            # This reduces noise and improves speed.
-            candidates_to_rerank = enhanced_results[:30]
+            # 2. Enhance with snippets & formatting
+            enhanced_results = self._enhance_results(diverse_candidates)
             
-            # 3. Cross-Encoder Reranking (The final quality step)
+            # 3. Limit candidates to top 40 for the final reranking step
+            # We increased this from 30 to 40 to allow more diverse options to be reranked.
+            candidates_to_rerank = enhanced_results[:40]
+            
+            # 4. Cross-Encoder Reranking (The final quality step)
             print(f"[SEARCH] Reranking {len(candidates_to_rerank)} candidates...")
             reranker = self._get_reranker()
             final_results = reranker.rerank(query_text, candidates_to_rerank, top_k=n_results)
@@ -174,8 +193,13 @@ class SearchEngine:
             document = result.get('document', '')
             snippet = document[:200] + "..." if len(document) > 200 else document
             
-            # Similarity here is the RRF score. No arbitrary boosting.
+            # Source-Aware Scoring: Give email_body a small structural preference
+            source_type = metadata.get('source_type', 'email_body')
             similarity = result.get('similarity', 0)
+            
+            if source_type == 'email_body':
+                # Small boost (0.02) to favor direct communications over static documents
+                similarity += 0.02
             
             enhanced.append({
                 'id': result['id'],
@@ -187,7 +211,7 @@ class SearchEngine:
                 'snippet': snippet,
                 'url': metadata.get('url', ''),
                 'similarity': round(similarity, 3),
-                'source_type': metadata.get('source_type', 'email_body'),
+                'source_type': source_type,
                 'filename': metadata.get('filename', ''),
                 'full_text': document
             })
