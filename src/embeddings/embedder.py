@@ -3,9 +3,10 @@ Embedding generator using sentence-transformers.
 Path: src/embeddings/embedder.py
 """
 import torch
-from typing import List, Union, Dict, Any
+from typing import List, Union, Dict, Any, Optional
 import numpy as np
 from sentence_transformers import SentenceTransformer
+from src.utils.config_loader import load_config
 
 
 class Embedder:
@@ -131,13 +132,17 @@ class Embedder:
 class Reranker:
     """Re-rank search results using a Cross-Encoder for higher precision"""
     
-    def __init__(self, model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"):
+    def __init__(self, model_name: Optional[str] = None):
         """
         Initialize the Reranker with a Cross-Encoder model.
         
         Args:
-            model_name: Cross-Encoder model name
+            model_name: Cross-Encoder model name. If None, loaded from config.
         """
+        if model_name is None:
+            config = load_config()
+            model_name = config.get('embeddings', {}).get('reranker_model_name', "BAAI/bge-reranker-base")
+            
         from sentence_transformers import CrossEncoder
         print(f"[INFO] Loading reranker model: {model_name}...")
         self.model = CrossEncoder(model_name)

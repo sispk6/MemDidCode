@@ -16,14 +16,12 @@ gmail:
 #     max_results: 50
 
 embeddings:
-  model_name: "sentence-transformers/all-MiniLM-L6-v2"
-  dimension: 384
+  model_name: "BAAI/bge-base-en-v1.5"
+  dimension: 768
+  reranker_model_name: "BAAI/bge-reranker-base"
 
 llm:
-  provider: "huggingface" # Options: "gemini", "huggingface"
-  # Gemini Configuration
-  # model_name: "gemini-2.0-flash"
-  # Hugging Face Configuration
+  provider: "huggingface"
   model_name: "meta-llama/Meta-Llama-3-8B-Instruct"
   api_key_env_var: "HUGGINGFACE_API_KEY"
 

@@ -65,7 +65,7 @@ class RAGBrain:
         """Initialize Hugging Face client"""
         self.hf_api_key = os.getenv(config.get('api_key_env_var', 'HUGGINGFACE_API_KEY'))
         # Using the standard OpenAI-compatible endpoint provided by HF Router
-        self.hf_api_url = f"https://router.huggingface.co/hf-inference/models/{self.model_name}/v1/chat/completions"
+        self.hf_api_url = "https://router.huggingface.co/v1/chat/completions"
         
         if not self.hf_api_key:
              print("[WARN] HUGGINGFACE_API_KEY not found. Inference will fail.")
@@ -129,7 +129,7 @@ class RAGBrain:
         
         # Note: The base URL for chat completions is often slightly different.
         # Let's try the standard /v1/chat/completions on the router base
-        url = "https://router.huggingface.co/v1/chat/completions"
+        url = self.hf_api_url
         
         response = requests.post(url, headers=headers, json=payload)
         

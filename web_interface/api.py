@@ -177,6 +177,10 @@ def _get_token_path(account_config: Dict[str, Any], user_id: str) -> Path:
 async def read_index():
     return FileResponse(str(static_dir / "index.html"))
 
+@app.get("/favicon.ico")
+async def favicon():
+    return FileResponse(str(static_dir / "favicon.png"))
+
 @app.post("/api/search")
 async def search(query: SearchQuery, user_id: str = Depends(get_user_id)):
     try:
